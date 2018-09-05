@@ -9,9 +9,15 @@
  **********************************************************************/
 
 #include <stdio.h>
-#include <zconf.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+
+/*prototypes*/
+void printHelpMessage();
+void printErrorMessage(char*);
+pid_t r_wait(int*);
+int whoAmI();
 
 /*************************************************!
  * @function    main
@@ -21,6 +27,8 @@
  * @returns     0 if it runs correctly.
  **************************************************/
 int main(int argc, const char* argv[]) {
+    char* firstArg = NULL;
+    char myString [1000];
     pid_t childPid = 0;
     int opt = 0;
     int i, numChildren;
@@ -38,18 +46,35 @@ int main(int argc, const char* argv[]) {
                 break;
 
             case 'p':
-                // TODO: create function for standard error message
+                snprintf(myString, sizeof myString, "%s: Error: Detailed error message", argv[0]);
+                printErrorMessage(firstArg);
                 break;
+
             default:
+                if(optopt == 'n' && argc != 3) {
+                    fprintf(stderr, "\n[ERROR]: Option -%c requires an integer argument\n", optopt);
+                    exit(EXIT_FAILURE);
+
+                } else if(optopt == 'n' && numChildren <= 0){
+                    printErrorMessage("\n[ERROR]: Number of children must be greater than zero\n");
+                    exit(EXIT_FAILURE);
+                }
+
                 printHelpMessage();
                 exit(EXIT_FAILURE);
         }
 
-        if(numChildren <= 0){
-            printErrorMessage(NULL);
-            exit(EXIT_FAILURE);
-        }
+
     }
+
+    for(i = 0; i < numChildren; i++) {
+        if(childPid = fork())
+            break;
+    }
+
+    whoAmI(childPid);
+
+    while(r_wait(NULL) > 0);  /* waiting for all the remaining child processes to finish */
 
     return 0;
 }
@@ -59,13 +84,13 @@ int main(int argc, const char* argv[]) {
  * @abstract    Prints usage statement
  **************************************************/
 void printHelpMessage() {
-    char* usageChildren = "\nUsage: ass1 -n <number of child processes>\nExecutes a process chain with the desired number of children.\n";
-    char* usageHelp = "\nUsage: ass1 -h\nDisplays help options.\n";
-    char* usageError = "\nUsage: ass1 -p\nDisplays a test error message using the perror function.\n";
+    char* usageChildren = "\nUSAGE: ./ass1 -n <number of child processes>\nDESCRIPTION: Executes a process chain with the desired number of children.\n";
+    char* usageHelp = "\nUSAGE: ./ass1 -h\nDESCRIPTION: Displays help options.\n";
+    char* usageError = "\nUSAGE: ./ass1 -p\nDESCRIPTION: Displays a test error message using the perror function.\n";
 
-    perror(usageChildren);
-    perror(usageHelp);
-    perror(usageError);
+    fprintf(stderr, "%s", usageChildren);
+    fprintf(stderr, "%s", usageHelp);
+    fprintf(stderr, "%s", usageError);
     exit(EXIT_SUCCESS);
 }
 
@@ -77,5 +102,22 @@ void printHelpMessage() {
 void printErrorMessage(char* message) {
     char* incorrectNumArgs = "\nERROR: There were an incorrect number of arguments entered.\n";
     message == NULL ? perror(incorrectNumArgs) : perror(message);
-    printHelpMessage();
+}
+
+/*************************************************!
+ * @function    r_wait
+ * @abstract    waits but doesn't block
+ * @param       stat_loc    return status
+ * @citation    pg. 72 Unix Systems Programming
+ **************************************************/
+pid_t r_wait(int* stat_loc){
+    int retval;
+
+    while(((retval = wait(stat_loc)) == -1) && (errno == EINTR));
+    return retval;
+}
+
+int whoAmI(){
+    printf("Child %d  My Parent is %d \n\n", getpid(), getppid());
+    return 1;
 }
