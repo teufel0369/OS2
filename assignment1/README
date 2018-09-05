@@ -9,13 +9,16 @@ If given `-p` option, the program will output a test error message.
 The goal of this homework is to become familiar with the environment in
 hoare while practicing system calls.
 
-USAGE: `ass1 -n NUMBER`
+USAGE: `./ass1 -n NUMBER`
+Description: Will fork the number of children as processes that were passed as an argument
 
-GIT REPOSITORY: https://github.com/teufel0369/OS.git
+USAGE: `./ass1 -p`
+Description: Will output a test error message using the perror method
 
-Select the directory you wish you to put the project in and issue the following:
+USAGE: `./ass1 -h`
+Description: Will output the help menu
 
-`git clone https://github.com/teufel0369/OS2.git`
+GIT REPOSITORY: https://github.com/teufel0369/OS2/assignment1.git
 
 VERSION CONTROL LOGGING:
 
