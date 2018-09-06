@@ -27,7 +27,6 @@ int whoAmI();
  * @returns     0 if it runs correctly.
  **************************************************/
 int main(int argc, char* const argv[]) {
-    char* firstArg = NULL;
     char myString [1000];
     pid_t childPid = 0;
     int opt = 0;
@@ -46,36 +45,38 @@ int main(int argc, char* const argv[]) {
                 break;
 
             case 'p':
-                snprintf(myString, sizeof myString, "%s: Error: Detailed error message", argv[0]);
-                printErrorMessage(firstArg);
+                snprintf(myString, sizeof myString, "\n%s: Error: Detailed error message\n", argv[0]);
+                printErrorMessage(argv[0]);
                 break;
 
             default:
                 if(optopt == 'n' && argc != 3) {
-                    fprintf(stderr, "\n[ERROR]: Option -%c requires an integer argument\n", optopt);
+                    snprintf(myString, sizeof myString, "\n%s: Error: Option -%c requires an integer argument.\n", argv[0], optopt);
+                    fprintf(stderr, "%s", myString);
                     exit(EXIT_FAILURE);
 
                 } else if(optopt == 'n' && numChildren < 0){
-                    printErrorMessage("\n[ERROR]: Number of children must be greater than zero\n");
+                    snprintf(myString, sizeof myString, "\n%s: Error: The number of child processes must be greater than 0.\n", argv[0]);
+                    fprintf(stderr, "%s", myString);
                     exit(EXIT_FAILURE);
                 }
 
-                printHelpMessage();
+                printHelpMessage(argv[0]);
                 exit(EXIT_FAILURE);
         }
-
-
     }
 
     /* fork some child processes and break the child from the loop if the parent process successfully forked */
-    for(i = 0; i < numChildren; i++) {
-        if((childPid = fork())){
-            break;
+    if(numChildren > 0) {
+        for(i = 0; i < numChildren; i++) {
+            if((childPid = fork())){
+                break;
+            }
         }
-    }
 
-    /* print out to ensure the processes are being forked by the parent */
-    whoAmI();
+        /* print out to ensure the processes are being forked by the parent */
+        whoAmI();
+    }
 
     /* waiting for all the remaining child processes to finish */
     while(r_wait(NULL) > 0);
@@ -91,12 +92,14 @@ void printHelpMessage(char* argv) {
     char usageChildren [1000];
     char usageHelp [1000];
     char usageError [1000];
+    char titleMenu [1000];
 
-    //Todo: construct argument from snprintf with the below messages then pass in argv[0]
-//    char* usageChildren = "\nUSAGE: ./ass1 -n <number of child processes>\nDESCRIPTION: Executes a process chain with the desired number of children.\n";
-//    char* usageHelp = "\nUSAGE: ./ass1 -h\nDESCRIPTION: Displays help options.\n";
-//    char* usageError = "\nUSAGE: ./ass1 -p\nDESCRIPTION: Displays a test error message using the perror function.\n";
+    snprintf(titleMenu, sizeof titleMenu, "\n################################ HELP MENU ################################");
+    snprintf(usageChildren, sizeof usageChildren, "\nUSAGE: %s -n <number of child processes>\nDESCRIPTION: Executes a process chain with the desired number of children.\n", argv);
+    snprintf(usageHelp, sizeof usageHelp, "\nUSAGE: %s -h\nDESCRIPTION: Displays help options.\n", argv);
+    snprintf(usageError, sizeof usageError, "\nUSAGE: %s -p\nDESCRIPTION: Displays a test error message using the perror function.\n", argv);
 
+    fprintf(stderr, "%s", titleMenu);
     fprintf(stderr, "%s", usageChildren);
     fprintf(stderr, "%s", usageHelp);
     fprintf(stderr, "%s", usageError);
@@ -108,9 +111,10 @@ void printHelpMessage(char* argv) {
  * @param       message    specific error message
  * @abstract    Prints error message
  **************************************************/
-void printErrorMessage(char* message) {
-    char* incorrectNumArgs = "\nERROR: There were an incorrect number of arguments entered.\n";
-    message == NULL ? perror(incorrectNumArgs) : perror(message);
+void printErrorMessage(char* argv) {
+    char testErrorMessage [1000];
+    snprintf(testErrorMessage, sizeof testErrorMessage, "\n%s: Error: Detailed error message\n", argv);
+    perror(testErrorMessage);
 }
 
 /*************************************************!
