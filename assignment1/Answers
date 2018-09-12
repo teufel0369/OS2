@@ -1,3 +1,18 @@
-1) 4147 -> 6352 -> 6353 -> 6354 -> 6355 -> 6356
+Chris Thompson
+Answers to Exercise 3.8: Process Chains
 
-2)
+1) Ran it.
+
+2) 4147 -> 6352 -> 6353 -> 6354 -> 6355 -> 6356
+
+3) 1/2
+
+4) 30
+
+5) It causes some threads to execute concurrently, as if they are racing to execute. This almost seems like I'm creating a thundering-herd problem.
+
+6) The wait before the last fprintf statement causes the threads to execute in reverse.
+
+7) Each child process executes each fprintf statement independently.
+
+8) All child processes are trying to read from stdin at the same time
