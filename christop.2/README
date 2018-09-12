@@ -1,0 +1,28 @@
+#  Unix System Calls and Library Functions
+
+
+SUMMARY:
+
+This project will create a process chain based on the `-n` flag command line argument.
+If given `-h` option, the program will output the standard help menu.
+If given `-p` option, the program will output a test error message.
+The goal of this homework is to become familiar with the environment in
+hoare while practicing system calls.
+
+USAGE: `./ass1 -n NUMBER`
+Description: Will fork the number of children as processes that were passed as an argument
+
+USAGE: `./ass1 -p`
+Description: Will output a test error message using the perror method
+
+USAGE: `./ass1 -h`
+Description: Will output the help menu
+
+GIT REPOSITORY: https://github.com/teufel0369/OS2/assignment1.git
+
+VERSION CONTROL LOGGING:
+
+This project was branched to a working branch at the beginning of the project and merged to master on <MERGE DATE>.
+You may see log of the commit history located at:
+
+COMMIT LOGS: `https://github.com/teufel0369/OS2/commits/master
