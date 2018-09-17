@@ -8,8 +8,10 @@
 
 /*prototypes*/
 void printHelpMessage(char*);
+void signalHandlerMaster(int) ;
 pid_t r_wait(int*);
 int whoAmI();
+
 
 /* GLOBALS */
 Process *pid;
@@ -22,7 +24,7 @@ int numTerminated = 0;
 
 int main(int argc, char* const argv[]) {
     char myString [1000];
-    pid_t childPid = 0;
+    char workerId[100];
     int opt = 0;
     int i, numChildren, maxChildren = 0;
     opterr = 0;
@@ -64,6 +66,21 @@ int main(int argc, char* const argv[]) {
         }
     }
 
+    /* allocate some memory for the array of processes */
+    pid = (Process *) malloc(sizeof(Process) * numChildren);
+
+    /* register signal handler (SIGINT) */
+    if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
+        perror("Error: Couldn't catch SIGINT\n");
+        exit(errno);
+    }
+
+    /* register signal handler (SIGALRM) */
+    if (signal(SIGALRM, signalHandlerMaster) == SIG_ERR) {
+        perror("Error: Couldn't catch SIGALRM\n");
+        exit(errno);
+    }
+
     /* create shared memory segment */
     if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
         perror("[-]ERROR: Failed to create shared memory segment.");
@@ -73,6 +90,24 @@ int main(int argc, char* const argv[]) {
     /* attach the shared memory */
     shm = shmat(sharedMemId, NULL, 0);
 
+    /* initialize the shared memory */
+    shm->seconds = 0;
+    shm->milliseconds = 0;
+
+    /* fork the processes */
+    for (i = 0; i < numChildren; i++) {
+        pid[i].pidIndex = i + 1;
+        pid[i].actualPid = fork();
+
+        if (pid[i].actualPid == 0) { /* if this is the child process */
+            sprintf(workerId, "%d", pid[i].pidIndex);
+            execl("./worker", "./worker", workerId, NULL); /* exec it off */
+        }
+        else if (pid[i].actualPid < 0) {
+            perror("[-]ERROR: Failed to fork CHILD process.\n");
+            exit(errno);
+        }
+    }
 
     return 0;
 }
