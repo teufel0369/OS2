@@ -8,7 +8,8 @@
 
 /*prototypes*/
 void printHelpMessage(char*);
-void signalHandlerMaster(int) ;
+void signalHandlerMaster(int);
+int detachAndRemove(int, void*);
 pid_t r_wait(int*);
 int whoAmI();
 
@@ -23,14 +24,15 @@ int indexCounter;
 int numTerminated = 0;
 
 int main(int argc, char* const argv[]) {
-    char myString [1000];
-    char workerId[100];
     int opt = 0;
     int i, numChildren, maxChildren = 0;
+    int wait_status;
+    char myString [1000];
+    char workerId[100];
     opterr = 0;
 
     /*get the options from the argv array*/
-    while((opt = getopt(argc, argv, "n:s::h")) != -1) {
+    while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
             case 'n':
                 numChildren = atoi(optarg);
@@ -46,20 +48,7 @@ int main(int argc, char* const argv[]) {
 
 
             default:
-                if (optopt == 'n' && argc != 3) {
-                    snprintf(myString, sizeof myString, "\n%s: Error: Option -%c requires an integer argument.\n",
-                             argv[0], optopt);
-                    fprintf(stderr, "%s", myString);
-                    exit(EXIT_FAILURE);
 
-                } else if ((optopt == 'n' && numChildren < 0)) {
-                    snprintf(myString, sizeof myString,
-                             "\n%s: Error: The number of workers must be greater than 0.\n", argv[0]);
-                    fprintf(stderr, "%s", myString);
-                    exit(EXIT_FAILURE);
-                } else if (optopt == 's' && maxChildren < 0) {
-                    snprintf(myString, sizeof myString, "\n%s: Error: The maximum number of workers must be greater than 0.\n", argv[0]);
-                }
 
                 printHelpMessage(argv[0]);
                 exit(EXIT_FAILURE);
@@ -108,6 +97,18 @@ int main(int argc, char* const argv[]) {
             exit(errno);
         }
     }
+
+    /* send signal to kill any remaining children */
+//    for (i = 0; i < numChildren; i++) {
+//        kill(pid[i].actualPid, SIGINT);
+//    }
+
+    /* wait for any remaining child processes to finish */
+    while (wait(&wait_status) > 0) { ; }
+
+    /* detach and remove the message queue, shared memory, and any allocated memory */
+    free(pid);
+    detachAndRemove(sharedMemId, shm);
 
     return 0;
 }
@@ -217,4 +218,34 @@ int getIndex(int logical) {
         if(pid[i].pidIndex == logical)
             return i;
     return -1;
+}
+
+/***************************************************!
+ * @function  getOptCheck
+ * @abstract  checks the arguments provided to getOpt
+ * @param     argc
+ * @param     maxChildren
+ * @param     argv
+ * @param     myString
+ **************************************************/
+void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
+    if (optopt == 'n' && argc != 3) {
+        snprintf(myString, sizeof myString, "\n%s: Error: Option -%c requires an integer argument.\n",
+                 argv[0], optopt);
+        fprintf(stderr, "%s", myString);
+        exit(EXIT_FAILURE);
+
+    } else if ((optopt == 'n' && numChildren < 0)) {
+        snprintf(myString, sizeof myString,
+                 "\n%s: Error: The number of workers must be greater than 0.\n", argv[0]);
+        fprintf(stderr, "%s", myString);
+        exit(EXIT_FAILURE);
+
+    } else if (optopt == 's' && maxChildren < 0) {
+        snprintf(myString, sizeof myString, "\n%s: Error: The maximum number of workers must be greater than 0.\n", argv[0]);
+
+    } else if (argc < 2) {
+        fprintf(stderr, "\n%s: Error: You must provide an argument.\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
 }

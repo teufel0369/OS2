@@ -18,8 +18,7 @@ Description: Will fork `x` number of processes with the `-n` flag and only allow
 USAGE: `./master -n <NUMBER>`
 Description: Will fork `x` number of processes with the `-n` flag.
 
-USAGE: `./master
- -h`
+USAGE: `./master -h`
 Description: Will output the help menu
 
 GIT REPOSITORY: https://github.com/teufel0369/OS2/christop.2.git
