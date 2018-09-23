@@ -12,6 +12,8 @@
 typedef struct SharedClock {
     int seconds;
     int milliseconds;
+    int doneFlag;
+    char* message;
 } SharedMemClock;
 
 typedef struct ProcessContainer {

@@ -220,6 +220,8 @@ int getIndex(int logical) {
     return -1;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wformat"
 /***************************************************!
  * @function  getOptCheck
  * @abstract  checks the arguments provided to getOpt
@@ -249,3 +251,4 @@ void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
         exit(EXIT_FAILURE);
     }
 }
+#pragma clang diagnostic pop
