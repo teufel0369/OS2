@@ -41,6 +41,7 @@ int main(int argc, char* const argv[]) {
 
         /* attach shared memory */
         shm = shmat(sharedMemId, NULL, 0);
+
         if(shm->doneFlag == 1) {
             shm->doneFlag = 0;
             snprintf(myString, sizeof myString, "Child %d  My Parent is %d\nMy process number is: %d\n\n", getpid(), getppid(), workerIndexNumber);
@@ -48,10 +49,12 @@ int main(int argc, char* const argv[]) {
             fprintf(stderr, "%s", shm->message);
             shm->message = "";
         }
+
         shm->doneFlag = 1;
         shmdt(shm);
-        kill(getpid(), SIGINT);
     }
+
+    return 0;
 }
 
 /*******************************************************!
