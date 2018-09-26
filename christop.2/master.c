@@ -38,7 +38,6 @@ int main(int argc, char* const argv[]) {
     char workerId[100];
     opterr = 0;
 
-
     /*get the options from the argv array*/
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
@@ -287,3 +286,18 @@ void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
     }
 }
 #pragma clang diagnostic pop
+
+/*************************************************!
+* @function    setUpTimer
+* @abstract    sets up the timer to start
+* @param       void
+* @returns     actual index from the pid array
+* @citation    pg. 318 Unix Systems Programming
+**************************************************/
+static int setUpTimer(void) {
+    struct itimerval value;
+    value.it_interval.tv_sec = 2;
+    value.it_interval.tv_usec = 0;
+    value.it_value = value.it_interval;
+    return (setitimer(ITIMER_PROF, &value, NULL));
+}
