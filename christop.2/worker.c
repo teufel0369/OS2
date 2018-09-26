@@ -54,7 +54,7 @@ int main(int argc, char* const argv[]) {
         shmdt(shm);
     }
 
-    return 0;
+    exit(EXIT_SUCCESS);
 }
 
 /*******************************************************!

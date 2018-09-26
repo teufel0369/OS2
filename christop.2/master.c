@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <sys/shm.h>
 #include <signal.h>
+#include <sys/time.h>
 #include "shared.h"
 
 /*prototypes*/
@@ -24,17 +25,18 @@ int queueId;
 int indexCounter;
 int numTerminated = 0;
 int sigChildReceived = 0;
+int status;
 int numAlive = 0;
 
 
 int main(int argc, char* const argv[]) {
     int opt = 0;
-    int i, numChildren, maxChildren = 0;
+    int i, numChildren = 0;
+    int maxChildren = NULL;
     int wait_status;
     char myString [1000];
     char workerId[100];
     opterr = 0;
-    sigset_t blockMask, emptyMask;
 
 
     /*get the options from the argv array*/
@@ -52,14 +54,13 @@ int main(int argc, char* const argv[]) {
                 printHelpMessage(argv[0]);
                 break;
 
-
             default:
-
-
                 printHelpMessage(argv[0]);
                 exit(EXIT_FAILURE);
         }
     }
+
+    maxChildren == NULL ? TOTAL_PROCESSES : maxChildren;
 
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
@@ -76,12 +77,6 @@ int main(int argc, char* const argv[]) {
         exit(errno);
     }
 
-    /* register signal handler (SIGALRM) */
-    if (signal(SIGCHLD, sigChildHandler) == SIG_ERR) {
-        perror("Error: Couldn't catch SIGCHLD\n");
-        exit(errno);
-    }
-
     /* create shared memory segment */
     if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
         perror("[-]ERROR: Failed to create shared memory segment.");
@@ -95,25 +90,21 @@ int main(int argc, char* const argv[]) {
     shm->seconds = 0;
     shm->milliseconds = 0;
 
-    /* Block SIGCHLD before forking */
-    sigemptyset(&blockMask);
-    sigaddset(&blockMask, SIGCHLD);
-    if (sigprocmask(SIG_SETMASK, &blockMask, NULL) == -1)
-        exit(EXIT_FAILURE);
+    signal(SIGCHLD, SIG_IGN);
 
     /* fork the processes */
     for (i = 0; i < numChildren; i++) {
         pid[i].pidIndex = i + 1;
 
-
         if(numAlive < maxChildren) {
+            signal(SIGCHLD, SIG_IGN);
             pid[i].actualPid = fork();
             numAlive += 1;
-
         } else {
-            sigsuspend()
+            wait(&status);
         }
 
+        signal(SIGCHLD, sigChildHandler);
         if (pid[i].actualPid == 0) { /* if this is the child process */
             sprintf(workerId, "%d", pid[i].pidIndex);
             execl("./worker", "./worker", workerId, NULL); /* exec it off */
@@ -126,9 +117,9 @@ int main(int argc, char* const argv[]) {
     }
 
     /* send signal to kill any remaining children */
-//    for (i = 0; i < numChildren; i++) {
-//        kill(pid[i].actualPid, SIGINT);
-//    }
+    for (i = 0; i < numChildren; i++) {
+        kill(pid[i].actualPid, SIGINT);
+    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -205,28 +196,20 @@ int detachAndRemove(int shmid, void *shmaddr) {
 }
 
 /*******************************************************!
-* @function    signalHandler
+* @function    sigChildHandler
 * @abstract    performs all necessary signal handling
+*              for all children
 *
 * @param       pidIndex index of the pidIndex
 * @returns     actual index from the pid array
 *******************************************************/
-void sigChildHandler(int signo) {
+void sigChildHandler(int sig) {
+    pid_t pid;
 
-    int status;
-    pid_t childPid;
+    pid = wait(NULL);
 
-    printf("\nSIG_HANDLER: SIGCHLD received\n");
-
-    while ((childPid = waitpid(-1, &status, WNOHANG)) > 0) {
-        numAlive--;
-    }
-
-    if (childPid == -1 && errno != ECHILD)
-        printf("\nSIG_HANDLER: waitpid");
-
-    sleep(2);
-    printf("\nSIG_HANDLER: returning control to MASTER\n");
+    printf("Pid %d exited.\n", pid);
+    numAlive -= 1;
 }
 
 /*******************************************************!
