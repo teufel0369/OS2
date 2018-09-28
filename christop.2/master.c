@@ -14,6 +14,9 @@ void sigChildHandler(int);
 int detachAndRemove(int, void*);
 pid_t r_wait(int*);
 int whoAmI();
+static void timerHandler(int);
+static int setUpInterrupt(void);
+static int setUpTimer(void);
 
 
 /* GLOBALS */
@@ -21,10 +24,6 @@ Process *pid;
 SharedMemClock *shm;
 int numChildren;
 int sharedMemId;
-int queueId;
-int indexCounter;
-int numTerminated = 0;
-int sigChildReceived = 0;
 int status;
 int numAlive = 0;
 
@@ -37,6 +36,20 @@ int main(int argc, char* const argv[]) {
     char myString [1000];
     char workerId[100];
     opterr = 0;
+
+//    if(setUpInterrupt() == -1) {
+//        snprintf(myString, sizeof myString,
+//                 "\n%s: Error: Failed to set up handler for SIGPROF\n", argv[0]);
+//        fprintf(stderr, "%s", myString);
+//        exit(EXIT_FAILURE);
+//    }
+//
+//    if(setUpTimer() == -1) {
+//        snprintf(myString, sizeof myString,
+//                 "\n%s: Error: Failed to set up handler for SIGPROF\n", argv[0]);
+//        fprintf(stderr, "%s", myString);
+//        exit(EXIT_FAILURE);
+//    }
 
     /*get the options from the argv array*/
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
@@ -59,7 +72,9 @@ int main(int argc, char* const argv[]) {
         }
     }
 
-    maxChildren == NULL ? TOTAL_PROCESSES : maxChildren;
+    if(maxChildren == NULL) {
+        maxChildren = 20;
+    }
 
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
@@ -89,14 +104,12 @@ int main(int argc, char* const argv[]) {
     shm->seconds = 0;
     shm->milliseconds = 0;
 
-    signal(SIGCHLD, SIG_IGN);
-
     /* fork the processes */
     for (i = 0; i < numChildren; i++) {
         pid[i].pidIndex = i + 1;
 
+
         if(numAlive < maxChildren) {
-            signal(SIGCHLD, SIG_IGN);
             pid[i].actualPid = fork();
             numAlive += 1;
         } else {
@@ -106,6 +119,7 @@ int main(int argc, char* const argv[]) {
         signal(SIGCHLD, sigChildHandler);
         if (pid[i].actualPid == 0) { /* if this is the child process */
             sprintf(workerId, "%d", pid[i].pidIndex);
+            shm->turn += 1;
             execl("./worker", "./worker", workerId, NULL); /* exec it off */
         }
 
@@ -116,9 +130,9 @@ int main(int argc, char* const argv[]) {
     }
 
     /* send signal to kill any remaining children */
-    for (i = 0; i < numChildren; i++) {
-        kill(pid[i].actualPid, SIGINT);
-    }
+//    for (i = 0; i < numChildren; i++) {
+//        kill(pid[i].actualPid, SIGINT);
+//    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -291,7 +305,7 @@ void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
 * @function    setUpTimer
 * @abstract    sets up the timer to start
 * @param       void
-* @returns     actual index from the pid array
+* @returns     a set timer
 * @citation    pg. 318 Unix Systems Programming
 **************************************************/
 static int setUpTimer(void) {
@@ -300,4 +314,41 @@ static int setUpTimer(void) {
     value.it_interval.tv_usec = 0;
     value.it_value = value.it_interval;
     return (setitimer(ITIMER_PROF, &value, NULL));
+}
+
+/*************************************************!
+* @function    setUpInterrupt
+* @abstract    sets up the interrupt to be caught
+* @param       void
+* @returns     a signal interrupt for ITIMER_PROF
+* @citation    pg. 318 Unix Systems Programming
+**************************************************/
+static int setUpInterrupt(void) {
+    struct sigaction action;
+    action.sa_handler = timerHandler;
+    action.sa_flags = 0;
+    return (sigemptyset(&action.sa_mask) || sigaction(SIGPROF, &action, NULL));
+}
+
+/*************************************************!
+* @function    timerHandler
+* @abstract    waits for all processes to finish
+*              then exits gracefully
+* @param       s
+* @citation    pg. 318 Unix Systems Programming
+**************************************************/
+static void timerHandler(int s) {
+    int i, wait_status;
+
+
+    for (i = 0; i < numChildren; i++) {
+        kill(pid[i].actualPid, SIGINT);
+    }
+
+    while (wait(&wait_status) > 0) { ; }
+
+    free(pid);
+    detachAndRemove(sharedMemId, shm);
+    printf("\nMASTER: Exiting gracefully. Execution time has exceeded 2 seconds.\n");
+    exit(0);
 }

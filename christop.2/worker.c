@@ -15,8 +15,10 @@ int detachAndRemove(int, void*);
 int workerIndexNumber;
 int sharedMemId;
 SharedMemClock *shm;
+long TIMER_INCREMENT = 3000000;
 
 int main(int argc, char* const argv[]) {
+    long timesIncremented = 0;
 
     if (argc < 2) {
         fprintf(stderr, "Error: Missing process number\n");
@@ -42,19 +44,34 @@ int main(int argc, char* const argv[]) {
         /* attach shared memory */
         shm = shmat(sharedMemId, NULL, 0);
 
-        if(shm->doneFlag == 1) {
-            shm->doneFlag = 0;
-            snprintf(myString, sizeof myString, "Child %d  My Parent is %d\nMy process number is: %d\n\n", getpid(), getppid(), workerIndexNumber);
-            shm->message = myString;
-            fprintf(stderr, "%s", shm->message);
-            shm->message = "";
+        while(1) {
+            if((shm->doneFlag == 1)  && (shm->turn == workerIndexNumber)) {
+                shm->doneFlag = 0;
+                snprintf(myString, sizeof myString, "\nChild %d  My Parent is %d\nMy process number is: %d\n\n", getpid(), getppid(), workerIndexNumber);
+                shm->message = myString;
+                fprintf(stderr, "%s", shm->message);
+                shm->message = "";
+
+                if((shm->milliseconds == 999) && (timesIncremented < TIMER_INCREMENT)) {
+                    shm->seconds += 1;
+                    shm->milliseconds = 000;
+                    timesIncremented += 1;
+
+                } else if((shm->milliseconds < 999) && (timesIncremented < TIMER_INCREMENT)) {
+                    shm->milliseconds += 1;
+                    timesIncremented += 1;
+
+                } else if(timesIncremented >= TIMER_INCREMENT) {
+                    break;
+                }
+            }
         }
 
+        shm->turn += 1;
         shm->doneFlag = 1;
         shmdt(shm);
+        return 0;
     }
-
-    exit(EXIT_SUCCESS);
 }
 
 /*******************************************************!

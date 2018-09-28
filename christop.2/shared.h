@@ -5,14 +5,12 @@
 
 #define SHARED_MEM_KEY 1775
 
-#define TOTAL_PROCESSES 20
-
-
 
 typedef struct SharedClock {
     int seconds;
     int milliseconds;
     int doneFlag;
+    int turn;
     char* message;
 } SharedMemClock;
 
