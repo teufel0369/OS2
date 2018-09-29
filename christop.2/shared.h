@@ -1,10 +1,10 @@
+#pragma once
+
 #ifndef CHRISTOP_2_SHARED_H
 #define CHRISTOP_2_SHARED_H
-
-#include <ntsid.h>
-
 #define SHARED_MEM_KEY 1775
 
+#include <stdlib.h>
 
 typedef struct SharedClock {
     int seconds;

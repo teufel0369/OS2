@@ -8,70 +8,74 @@
 
 /*prototypes*/
 void signalHandlerChild(int);
-int whoAmI(int);
 int detachAndRemove(int, void*);
 
 /* GLOBALS */
 int workerIndexNumber;
 int sharedMemId;
 SharedMemClock *shm;
-long TIMER_INCREMENT = 3000000;
 
 int main(int argc, char* const argv[]) {
     long timesIncremented = 0;
 
     if (argc < 2) {
-        fprintf(stderr, "Error: Missing process number\n");
+        fprintf(stderr, "Error: Missing index number\n");
         exit(1);
+    }
 
-    } else {
-        workerIndexNumber = atoi(argv[1]);
+    workerIndexNumber = atoi(argv[1]);
 
-        /* register signal handler */
-        if (signal(SIGINT, signalHandlerChild) == SIG_ERR) {
-            perror("Error: Couldn't catch SIGTERM.\n");
-            exit(errno);
-        }
+    /* register signal handler */
+    if (signal(SIGINT, signalHandlerChild) == SIG_ERR) {
+        perror("Error: Couldn't catch SIGTERM.\n");
+        exit(errno);
+    }
 
-        /* access shared memory segment */
-        if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), 0600)) < 0) {
-            perror("Error: shmget");
-            exit(errno);
-        }
+    /* access shared memory segment */
+    if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), 0600)) < 0) {
+        perror("Error: shmget");
+        exit(errno);
+    }
 
-        char myString[1000];
+    char myString[1000];
 
-        /* attach shared memory */
-        shm = shmat(sharedMemId, NULL, 0);
+    /* attach shared memory */
+    shm = shmat(sharedMemId, NULL, 0);
+
+    if(shm->doneFlag == 1) {
+        shm->doneFlag = 0;
+        snprintf(myString, sizeof myString, "\nWorker %d  My Parent is %d\nMy process number is: %d\n", getpid(), getppid(), workerIndexNumber);
+        shm->message = myString;
+        fprintf(stderr, "%s", shm->message);
+        snprintf(myString, sizeof myString, "Worker %d beginning to increment the clock.\n", getpid());
+        shm->message = myString;
+        fprintf(stderr, "%s", shm->message);
 
         while(1) {
-            if((shm->doneFlag == 1)  && (shm->turn == workerIndexNumber)) {
-                shm->doneFlag = 0;
-                snprintf(myString, sizeof myString, "\nChild %d  My Parent is %d\nMy process number is: %d\n\n", getpid(), getppid(), workerIndexNumber);
+            if(timesIncremented == 3000000) {
+                snprintf(myString, sizeof myString, "\nWorker %d has reached 3000000 increments and will be terminating.\n"
+                                                    "Shared Memory Seconds: %d\n"
+                                                    "Shared Memory Milliseconds: %d\n", getpid(), shm->seconds, shm->milliseconds);
                 shm->message = myString;
                 fprintf(stderr, "%s", shm->message);
-                shm->message = "";
+                break;
+            }
 
-                if((shm->milliseconds == 999) && (timesIncremented < TIMER_INCREMENT)) {
-                    shm->seconds += 1;
-                    shm->milliseconds = 000;
-                    timesIncremented += 1;
-
-                } else if((shm->milliseconds < 999) && (timesIncremented < TIMER_INCREMENT)) {
-                    shm->milliseconds += 1;
-                    timesIncremented += 1;
-
-                } else if(timesIncremented >= TIMER_INCREMENT) {
-                    break;
-                }
+            if((shm->milliseconds >= 999) && (timesIncremented < 3000000)) {
+                shm->seconds += 1;
+                shm->milliseconds = 000;
+                timesIncremented += 1;
+            } else if((shm->milliseconds < 999) && (timesIncremented < 3000000)) {
+                shm->milliseconds += 1;
+                timesIncremented += 1;
             }
         }
-
-        shm->turn += 1;
-        shm->doneFlag = 1;
-        shmdt(shm);
-        return 0;
     }
+
+    shm->turn += 1;
+    shm->doneFlag = 1;
+    shmdt(shm);
+    return 0;
 }
 
 /*******************************************************!
@@ -83,16 +87,6 @@ int main(int argc, char* const argv[]) {
 *******************************************************/
 void signalHandlerChild(int signal) {
     exit(0);
-}
-
-/*************************************************!
- * @function    whoAmI
- * @abstract    used for testing
- * @param       stat_loc    return status
- **************************************************/
-int whoAmI(int processNum){
-    printf("Child %d  My Parent is %d\nMy process number is: %d\n\n", getpid(), getppid(), processNum);
-    return 1;
 }
 
 /*************************************************!

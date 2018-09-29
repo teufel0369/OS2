@@ -10,13 +10,10 @@
 /*prototypes*/
 void printHelpMessage(char*);
 void signalHandlerMaster(int);
-void sigChildHandler(int);
 int detachAndRemove(int, void*);
 pid_t r_wait(int*);
-int whoAmI();
 static void timerHandler(int);
-static int setUpInterrupt(void);
-static int setUpTimer(void);
+
 
 
 /* GLOBALS */
@@ -24,7 +21,6 @@ Process *pid;
 SharedMemClock *shm;
 int numChildren;
 int sharedMemId;
-int status;
 int numAlive = 0;
 
 
@@ -33,23 +29,8 @@ int main(int argc, char* const argv[]) {
     int i, numChildren = 0;
     int maxChildren = NULL;
     int wait_status;
-    char myString [1000];
     char workerId[100];
     opterr = 0;
-
-//    if(setUpInterrupt() == -1) {
-//        snprintf(myString, sizeof myString,
-//                 "\n%s: Error: Failed to set up handler for SIGPROF\n", argv[0]);
-//        fprintf(stderr, "%s", myString);
-//        exit(EXIT_FAILURE);
-//    }
-//
-//    if(setUpTimer() == -1) {
-//        snprintf(myString, sizeof myString,
-//                 "\n%s: Error: Failed to set up handler for SIGPROF\n", argv[0]);
-//        fprintf(stderr, "%s", myString);
-//        exit(EXIT_FAILURE);
-//    }
 
     /*get the options from the argv array*/
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
@@ -91,8 +72,10 @@ int main(int argc, char* const argv[]) {
         exit(errno);
     }
 
+    alarm(2);
+
     /* create shared memory segment */
-    if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
+    if ((sharedMemId = shmget(IPC_PRIVATE, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
         perror("[-]ERROR: Failed to create shared memory segment.");
         exit(errno);
     }
@@ -101,38 +84,40 @@ int main(int argc, char* const argv[]) {
     shm = shmat(sharedMemId, NULL, 0);
 
     /* initialize the shared memory */
+    shm->doneFlag = 0;
     shm->seconds = 0;
     shm->milliseconds = 0;
+    shm->turn = 1;
+    shm->doneFlag = 1;
+    shmdt(shm);
 
-    /* fork the processes */
-    for (i = 0; i < numChildren; i++) {
+    i = 0;
+    while(i < numChildren) {
         pid[i].pidIndex = i + 1;
+        pid[i].actualPid = fork();
+        numAlive += 1;
 
-
-        if(numAlive < maxChildren) {
-            pid[i].actualPid = fork();
-            numAlive += 1;
-        } else {
-            wait(&status);
+        if(numAlive == maxChildren) {
+            r_wait((pid_t)0);
+            numAlive -=1;
         }
 
-        signal(SIGCHLD, sigChildHandler);
-        if (pid[i].actualPid == 0) { /* if this is the child process */
+        if(pid[i].actualPid == 0) {
             sprintf(workerId, "%d", pid[i].pidIndex);
-            shm->turn += 1;
-            execl("./worker", "./worker", workerId, NULL); /* exec it off */
+            execl("./worker", "./worker ", workerId, (char*) NULL); /* exec it off */
+
+        } else if (pid[i].actualPid < 0) {
+                perror("[-]ERROR: Failed to fork CHILD process.\n");
+                exit(errno);
         }
 
-        else if (pid[i].actualPid < 0) {
-            perror("[-]ERROR: Failed to fork CHILD process.\n");
-            exit(errno);
-        }
+        i += 1;
     }
 
     /* send signal to kill any remaining children */
-//    for (i = 0; i < numChildren; i++) {
-//        kill(pid[i].actualPid, SIGINT);
-//    }
+    for (i = 0; i < numChildren; i++) {
+        kill(pid[i].actualPid, SIGINT);
+    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -221,7 +206,7 @@ void sigChildHandler(int sig) {
 
     pid = wait(NULL);
 
-    printf("Pid %d exited.\n", pid);
+    printf("WORKER: WORKER %d exited. Refer to signal.h for error code %d.\n", pid, sig);
     numAlive -= 1;
 }
 
@@ -237,9 +222,9 @@ void signalHandlerMaster(int signo) {
 
     if (signo == SIGINT || signo == SIGALRM) {
         if (signo == SIGINT)
-            printf("MASTER: SIGNAL: SIGINT detected by MASTER\n");
+            printf("\nMASTER: SIGINT detected by MASTER. Exiting.\n");
         else
-            printf("MASTER: SIGNAL: SIGALRM detected by MASTER\n");
+            printf("\nMASTER: SIGALRM detected by MASTER because the program time exceeded 2 seconds. Exiting.\n");
 
         for (i = 0; i < numChildren; i++) {
             kill(pid[i].actualPid, SIGINT);
@@ -301,54 +286,4 @@ void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
 }
 #pragma clang diagnostic pop
 
-/*************************************************!
-* @function    setUpTimer
-* @abstract    sets up the timer to start
-* @param       void
-* @returns     a set timer
-* @citation    pg. 318 Unix Systems Programming
-**************************************************/
-static int setUpTimer(void) {
-    struct itimerval value;
-    value.it_interval.tv_sec = 2;
-    value.it_interval.tv_usec = 0;
-    value.it_value = value.it_interval;
-    return (setitimer(ITIMER_PROF, &value, NULL));
-}
 
-/*************************************************!
-* @function    setUpInterrupt
-* @abstract    sets up the interrupt to be caught
-* @param       void
-* @returns     a signal interrupt for ITIMER_PROF
-* @citation    pg. 318 Unix Systems Programming
-**************************************************/
-static int setUpInterrupt(void) {
-    struct sigaction action;
-    action.sa_handler = timerHandler;
-    action.sa_flags = 0;
-    return (sigemptyset(&action.sa_mask) || sigaction(SIGPROF, &action, NULL));
-}
-
-/*************************************************!
-* @function    timerHandler
-* @abstract    waits for all processes to finish
-*              then exits gracefully
-* @param       s
-* @citation    pg. 318 Unix Systems Programming
-**************************************************/
-static void timerHandler(int s) {
-    int i, wait_status;
-
-
-    for (i = 0; i < numChildren; i++) {
-        kill(pid[i].actualPid, SIGINT);
-    }
-
-    while (wait(&wait_status) > 0) { ; }
-
-    free(pid);
-    detachAndRemove(sharedMemId, shm);
-    printf("\nMASTER: Exiting gracefully. Execution time has exceeded 2 seconds.\n");
-    exit(0);
-}
