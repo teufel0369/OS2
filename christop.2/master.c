@@ -34,7 +34,7 @@ int main(int argc, char* const argv[]) {
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
             case 'n':
-                numChildren = atoi(optarg);
+                numChildren = strtol optarg);
                 break;
 
             case 's':
@@ -50,6 +50,7 @@ int main(int argc, char* const argv[]) {
         }
     }
 
+    perror("made it 2");
     if(maxChildren == 0) {
         maxChildren = 20;
     }
@@ -80,7 +81,6 @@ int main(int argc, char* const argv[]) {
         exit(errno);
     }
 
-    perror("made it 2");
     /* attach the shared memory */
     shm = shmat(sharedMemId, NULL, 0);
 
