@@ -26,21 +26,23 @@ int main(int argc, char* const argv[]) {
     int maxChildren = 0;
     int wait_status;
     char workerId[100];
+    char* nVal = NULL;
+    char* sVal = NULL;
     opterr = 0;
     numAlive = 0;
 
     perror("made it 1");
     /*get the options from the argv array*/
-    while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
+    while((opt = getopt(argc, argv, "n:s::h")) != -1) {
         switch (opt) {
             case 'n':
                 perror("made it 1.1");
-                numChildren = atoi(optarg);
+                nVal = optarg;
                 break;
 
             case 's':
                 perror("made it 1.2");
-                maxChildren = atoi(optarg);
+                sVal = optarg;
                 break;
 
             case 'h':
@@ -53,16 +55,16 @@ int main(int argc, char* const argv[]) {
         }
     }
 
+    numChildren = nVal != NULL ? atoi(nVal) : 20;
+    maxChildren = nVal != NULL ? atoi(sVal) : 20;
+
     perror("made it 2");
-    if(maxChildren == 0) {
-        maxChildren = 20;
-    }
 
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
 
-//    /* allocate memory for shared memory clock */
-//    shm = (SharedMemClock *) malloc(sizeof(SharedMemClock) * 1);
+    /* allocate memory for shared memory clock */
+    shm = (SharedMemClock *) malloc(sizeof(SharedMemClock) * 1);
 
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
