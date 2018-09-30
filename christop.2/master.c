@@ -33,7 +33,7 @@ int main(int argc, char* const argv[]) {
 
     perror("made it 1");
     /*get the options from the argv array*/
-    while((opt = getopt(argc, argv, "n:s::h")) != -1) {
+    while((opt = getopt(argc, argv, "hn:s::")) != -1) {
         switch (opt) {
             case 'n':
                 perror("made it 1.1");
@@ -132,6 +132,7 @@ int main(int argc, char* const argv[]) {
 
     /* detach and remove the message queue, shared memory, and any allocated memory */
     free(pid);
+    free(shm);
     detachAndRemove(sharedMemId, shm);
 
     return 0;
