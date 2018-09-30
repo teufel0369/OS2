@@ -55,6 +55,7 @@ int main(int argc, char* const argv[]) {
         }
     }
 
+    perror("made it 1.9");
     numChildren = nVal != NULL ? atoi(nVal) : 20;
     maxChildren = nVal != NULL ? atoi(sVal) : 20;
 
