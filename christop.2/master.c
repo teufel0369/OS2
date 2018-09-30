@@ -127,7 +127,6 @@ int main(int argc, char* const argv[]) {
 
     /* detach and remove the message queue, shared memory, and any allocated memory */
     free(pid);
-    free(shm);
     detachAndRemove(sharedMemId, shm);
 
     return 0;
