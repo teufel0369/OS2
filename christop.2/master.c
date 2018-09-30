@@ -60,6 +60,9 @@ int main(int argc, char* const argv[]) {
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
 
+    /* allocate memory for shared memory clock */
+    shm = (SharedMemClock *) malloc(sizeof(SharedMemClock) * 1);
+
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
         perror("Error: Couldn't catch SIGINT\n");
