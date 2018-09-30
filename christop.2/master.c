@@ -34,7 +34,7 @@ int main(int argc, char* const argv[]) {
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
             case 'n':
-                numChildren = strtol optarg);
+                numChildren = atoi(optarg);
                 break;
 
             case 's':
