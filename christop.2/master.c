@@ -31,9 +31,8 @@ int main(int argc, char* const argv[]) {
     opterr = 0;
     numAlive = 0;
 
-    perror("made it 1");
     /*get the options from the argv array*/
-    while((opt = getopt(argc, argv, "hn:s::")) != -1) {
+    while((opt = getopt(argc, argv, "n:s:h")) != -1) {
         switch (opt) {
             case 'n':
                 perror("made it 1.1");
@@ -55,11 +54,9 @@ int main(int argc, char* const argv[]) {
         }
     }
 
-    perror("made it 1.9");
     numChildren = nVal != NULL ? atoi(nVal) : 20;
     maxChildren = nVal != NULL ? atoi(sVal) : 20;
 
-    perror("made it 2");
 
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
