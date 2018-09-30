@@ -29,6 +29,7 @@ int main(int argc, char* const argv[]) {
     opterr = 0;
     numAlive = 0;
 
+    perror("made it 1");
     /*get the options from the argv array*/
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
@@ -79,9 +80,11 @@ int main(int argc, char* const argv[]) {
         exit(errno);
     }
 
+    perror("made it 2");
     /* attach the shared memory */
     shm = shmat(sharedMemId, NULL, 0);
 
+    perror("made it 3");
     /* initialize the shared memory */
     shm->doneFlag = 0;
     shm->seconds = 0;
@@ -90,6 +93,7 @@ int main(int argc, char* const argv[]) {
     shm->doneFlag = 1;
     shmdt(shm);
 
+    perror("made it 2");
     i = 0;
     while(i < numChildren) {
         pid[i].pidIndex = i + 1;
