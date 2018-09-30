@@ -35,12 +35,10 @@ int main(int argc, char* const argv[]) {
     while((opt = getopt(argc, argv, "n:s:h")) != -1) {
         switch (opt) {
             case 'n':
-                perror("made it 1.1");
                 nVal = optarg;
                 break;
 
             case 's':
-                perror("made it 1.2");
                 sVal = optarg;
                 break;
 
@@ -49,7 +47,6 @@ int main(int argc, char* const argv[]) {
                 break;
 
             default:
-                perror("made it 1.4");
                 exit(EXIT_FAILURE);
         }
     }
@@ -259,38 +256,5 @@ int getIndex(int logical) {
             return i;
     return -1;
 }
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wformat"
-/***************************************************!
- * @function  getOptCheck
- * @abstract  checks the arguments provided to getOpt
- * @param     argc
- * @param     maxChildren
- * @param     argv
- * @param     myString
- **************************************************/
-void getOptCheck(int argc, int maxChildren, char* const argv, char* myString) {
-    if (optopt == 'n' && argc != 3) {
-        snprintf(myString, sizeof myString, "\n%s: Error: Option -%c requires an integer argument.\n",
-                 argv[0], optopt);
-        fprintf(stderr, "%s", myString);
-        exit(EXIT_FAILURE);
-
-    } else if ((optopt == 'n' && numChildren < 0)) {
-        snprintf(myString, sizeof myString,
-                 "\n%s: Error: The number of workers must be greater than 0.\n", argv[0]);
-        fprintf(stderr, "%s", myString);
-        exit(EXIT_FAILURE);
-
-    } else if (optopt == 's' && maxChildren < 0) {
-        snprintf(myString, sizeof myString, "\n%s: Error: The maximum number of workers must be greater than 0.\n", argv[0]);
-
-    } else if (argc < 2) {
-        fprintf(stderr, "\n%s: Error: You must provide an argument.\n", argv[0]);
-        exit(EXIT_FAILURE);
-    }
-}
-#pragma clang diagnostic pop
 
 
