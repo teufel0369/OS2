@@ -34,10 +34,12 @@ int main(int argc, char* const argv[]) {
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
         switch (opt) {
             case 'n':
+                perror("made it 1.1");
                 numChildren = atoi(optarg);
                 break;
 
             case 's':
+                perror("made it 1.2");
                 maxChildren = atoi(optarg);
                 break;
 
@@ -46,6 +48,7 @@ int main(int argc, char* const argv[]) {
                 break;
 
             default:
+                perror("made it 1.4");
                 exit(EXIT_FAILURE);
         }
     }
