@@ -79,7 +79,7 @@ int main(int argc, char* const argv[]) {
     alarm(2);
 
     /* create shared memory segment */
-    if ((sharedMemId = shmget(IPC_PRIVATE, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
+    if ((sharedMemId = shmget(SHARED_MEM_KEY, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
         perror("[-]ERROR: Failed to create shared memory segment.");
         exit(errno);
     }
