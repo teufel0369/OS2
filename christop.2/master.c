@@ -12,9 +12,6 @@ void printHelpMessage(char*);
 void signalHandlerMaster(int);
 int detachAndRemove(int, void*);
 pid_t r_wait(int*);
-static void timerHandler(int);
-
-
 
 /* GLOBALS */
 Process *pid;
@@ -23,11 +20,10 @@ int numChildren;
 int sharedMemId;
 int numAlive = 0;
 
-
 int main(int argc, char* const argv[]) {
     int opt = 0;
     int i, numChildren = 0;
-    int maxChildren = NULL;
+    int maxChildren = 0;
     int wait_status;
     char workerId[100];
     opterr = 0;
@@ -48,20 +44,19 @@ int main(int argc, char* const argv[]) {
                 break;
 
             default:
-                printHelpMessage(argv[0]);
                 exit(EXIT_FAILURE);
         }
     }
 
-    if(maxChildren == NULL) {
+    if(maxChildren == 0) {
         maxChildren = 20;
     }
 
     /* allocate some memory for the array of processes */
     pid = (Process *) malloc(sizeof(Process) * numChildren);
 
-    /* allocate memory for shared memory clock */
-    shm = (SharedMemClock *) malloc(sizeof(SharedMemClock) * 1);
+//    /* allocate memory for shared memory clock */
+//    shm = (SharedMemClock *) malloc(sizeof(SharedMemClock) * 1);
 
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
