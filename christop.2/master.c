@@ -18,7 +18,7 @@ Process *pid;
 SharedMemClock *shm;
 int numChildren;
 int sharedMemId;
-int numAlive = 0;
+int numAlive;
 
 int main(int argc, char* const argv[]) {
     int opt = 0;
@@ -27,6 +27,7 @@ int main(int argc, char* const argv[]) {
     int wait_status;
     char workerId[100];
     opterr = 0;
+    numAlive = 0;
 
     /*get the options from the argv array*/
     while((opt = getopt(argc, argv, ":n:s::h")) != -1) {
