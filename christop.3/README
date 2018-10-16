@@ -12,15 +12,15 @@ USAGE: `./oss -s <NUMBER OF PROCESSES> -l <FILENAME.data> -t <SECONDS TO TIMEOUT
 		 filename will default to `data.out`
 		 seconds to timeout willl default to 20				
 
-GIT REPOSITORY: https://github.com/teufel0369/OS.git
+GIT REPOSITORY: https://github.com/teufel0369/OS2.git
 
 Select the directory you wish you to put the project in and issue the following:
 
-`git clone https://github.com/teufel0369/OS.git`
+`git clone https://github.com/teufel0369/OS2.git`
 
 VERSION CONTROL LOGGING:
 
 This project was branched to a working branch at the beginning of the project and merged to master on 9 March 2018.
 You may see log of the commit history located at:
 
-COMMIT LOGS: `https://github.com/teufel0369/OS/commits/master`
+COMMIT LOGS: `https://github.com/teufel0369/OS2/commits/master`
