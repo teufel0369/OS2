@@ -25,6 +25,6 @@ typedef struct ProcessControlBlock {
     pid_t actualPid;
     int seconds;
     int nanoSeconds;
-} Process;
+} PCB;
 
 #endif //O2_THOMPSON_4_SHARED_H
