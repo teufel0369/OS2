@@ -25,6 +25,8 @@
 PCB* pcb;
 SharedMemClock* sharedMemClock;
 UserProcess* userProcess;
+Queue* lowPriorityQueue;
+Queue* highPriorityQueue;
 
 /* GLOBAL MISC */
 char* fileName;
@@ -37,16 +39,20 @@ int queueSharedMemId;
 int sharedMemClockId;
 int timerAmount;
 
-
 /* PROTOTYPES */
+void advanceSharedMemoryClock();
+long checkLogFile(FILE*);
 void displayHelp(int);
 int detachAndRemove(int, void*);
-long checkLogFile(FILE*);
-int randomNumberGenerator(int, int);
-void signalHandlerMaster(int);
+Queue* generateQueue(unsigned int);
+boolean isQueueEmpty(Queue* queue);
+boolean isQueueFull(Queue*);
+int popFromQueue(Queue*, char*);
 void processControlBlocksSetup();
+void pushToQueue(Queue*, int, char*);
+int randomNumberGenerator(int, int);
 void sharedMemoryClockSetup();
-void advanceSharedMemoryClock();
+void signalHandlerMaster(int);
 
 /*************************************************!
 * @function    main
@@ -111,7 +117,9 @@ int main(int argc, char **argv) {
     /* set up the process control blocks */
     processControlBlocksSetup();
 
-    /*  */
+    /* set up the high and low priority queues */
+    lowPriorityQueue = generateQueue(18);
+    highPriorityQueue = generateQueue(18);
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -300,4 +308,63 @@ struct Queue* generateQueue(unsigned int capacity) {
     queue->rear = capacity - 1;
     queue->array = (int*)malloc(queue->queueCapacity * sizeof(int));
     return queue;
+}
+
+/*******************************************************!
+* @function    isQueueFull
+* @abstract    checks to see if the queue is full
+* @param       queue
+* @returns     true or false
+*******************************************************/
+boolean isQueueFull(Queue* queue) {
+    return (queue->size == queue->queueCapacity);
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    checks to see if the queue is empty
+* @param       queue
+* @returns     true or false
+*******************************************************/
+boolean isQueueEmpty(Queue* queue) {
+    return(queue->size == 0);
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    adds the item to the queue if there is
+*              space available
+* @param       queue
+* @param       item
+* @param       priority
+*******************************************************/
+void pushToQueue(struct Queue* queue, int item, char* priority) {
+    if(isQueueFull(queue)) {
+        return;
+    }
+    else {
+        queue->rear = (queue->rear+1)%queue->queueCapacity;
+        queue->array[queue->rear] = item;
+        queue->size += 1;
+        printf("\n%d was added to the %s priority queue\n", item, priority);
+    }
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    pops the item off of the queue
+* @param       queue
+* @return      item or
+*******************************************************/
+int popFromQueue(Queue* queue, char* priority) {
+    if(isQueueEmpty(queue)) {
+        return 0;
+    }
+    else {
+        int item = queue->array[queue->front];
+        queue->front = (queue->front + 1)%queue->queueCapacity;
+        queue->size = queue->size - 1;
+        printf("\n%d was popped from the %s priority queue\n", item, priority);
+        return item;
+    }
 }

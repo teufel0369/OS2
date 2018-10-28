@@ -8,7 +8,12 @@
 
 #define DEFAULT_TIMER 20
 #define DEFAULT_FILENAME "log.out"
-#define TIME_QUANTUM
+#define QUANTUM_FULL 1000000
+#define QUANTUM_HALF 500000
+
+typedef int boolean;
+#define true 1
+#define false 0
 
 #include <stdlib.h>
 
