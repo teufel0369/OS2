@@ -11,10 +11,6 @@
 #define QUANTUM_FULL 1000000
 #define QUANTUM_HALF 500000
 
-typedef int boolean;
-#define true 1
-#define false 0
-
 #include <stdlib.h>
 
 typedef struct SharedClock {
@@ -26,6 +22,16 @@ typedef struct Message {
     long messageType;
     int childId;
     int doneFlag;
+    int index;
+    int resumeTime;
+    int burstTime;
+    int completeFlag;
+    int blockFlag;
+    int moveFlag;
+    int terminateFlag;
+    int priority;
+    int duration;
+    int progress;
     int seconds;
     int nanoSeconds;
 } Message;
@@ -33,6 +39,12 @@ typedef struct Message {
 typedef struct ProcessControlBlock {
     int pidIndex;
     pid_t actualPid;
+    int priority;
+    int isBlocked;
+    int burstTime;
+    int resumeTime;
+    int duration;
+    int progress;
 } PCB;
 
 typedef struct UserProcess {

@@ -20,7 +20,6 @@
 #include <sys/msg.h>
 #include "shared.h"
 
-
 /* GLOBAL STRUCTS */
 PCB* pcb;
 SharedMemClock* sharedMemClock;
@@ -44,12 +43,14 @@ void advanceSharedMemoryClock();
 long checkLogFile(FILE*);
 void displayHelp(int);
 int detachAndRemove(int, void*);
+int determineQueuePlacement();
 Queue* generateQueue(unsigned int);
-boolean isQueueEmpty(Queue* queue);
-boolean isQueueFull(Queue*);
+int isQueueEmpty(Queue* queue);
+int isQueueFull(Queue*);
 int popFromQueue(Queue*, char*);
 void processControlBlocksSetup();
 void pushToQueue(Queue*, int, char*);
+int random5050();
 int randomNumberGenerator(int, int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
@@ -62,6 +63,7 @@ void signalHandlerMaster(int);
 * @returns     0... hopefully
 **************************************************/
 int main(int argc, char **argv) {
+    srand(time(NULL));
     int c, wait_status;
     char* lvalue = NULL;
     char* tvalue = NULL;
@@ -248,12 +250,13 @@ void processControlBlocksSetup() {
     /* attach the shared memory process control blocks */
     pcbAddress = shmat(pcbSharedMemId, NULL, 0);
 
-    //initialize pcb with slaveID = -1;
+    /* Initial the index and actual pid of the PCB */
     pcb = (PCB*) ((void*)pcbAddress+sizeof(int));
 
     int i;
     for(i = 0; i < 18; i++) {
-
+        userProcess[i].actualPid = -1;
+        userProcess[i].index = i;
     }
 }
 
@@ -287,10 +290,13 @@ void advanceSharedMemoryClock() {
     int nanoRandom = randomNumberGenerator(1000, 0);
     sharedMemClock->nanoSeconds += nanoRandom;
     sharedMemClock->seconds += 1;
+
+    //TODO: the below code may create an issue
     if(sharedMemClock->nanoSeconds >= 999999999) {
         tempVar = sharedMemClock->nanoSeconds - 999999999;
         sharedMemClock->seconds += 1;
         sharedMemClock->nanoSeconds = tempVar;
+
     }
 }
 
@@ -316,7 +322,7 @@ struct Queue* generateQueue(unsigned int capacity) {
 * @param       queue
 * @returns     true or false
 *******************************************************/
-boolean isQueueFull(Queue* queue) {
+int isQueueFull(Queue* queue) {
     return (queue->size == queue->queueCapacity);
 }
 
@@ -326,7 +332,7 @@ boolean isQueueFull(Queue* queue) {
 * @param       queue
 * @returns     true or false
 *******************************************************/
-boolean isQueueEmpty(Queue* queue) {
+int isQueueEmpty(Queue* queue) {
     return(queue->size == 0);
 }
 
@@ -354,7 +360,7 @@ void pushToQueue(struct Queue* queue, int item, char* priority) {
 * @function    isQueueEmpty
 * @abstract    pops the item off of the queue
 * @param       queue
-* @return      item or
+* @return      item
 *******************************************************/
 int popFromQueue(Queue* queue, char* priority) {
     if(isQueueEmpty(queue)) {
@@ -367,4 +373,58 @@ int popFromQueue(Queue* queue, char* priority) {
         printf("\n%d was popped from the %s priority queue\n", item, priority);
         return item;
     }
+}
+
+/*******************************************************!
+* @function    determineQueuePlacement
+* @abstract    determines the probability of queue
+*              placement
+* @param       queue
+* @return      1 or 0
+*******************************************************/
+int determineQueuePlacement() {
+    return random5050() | random5050();
+}
+
+/*******************************************************!
+* @function    random5050
+* @abstract    generates even or odd with equal
+*              probability
+* @return      returns 1 if odd, 0 if even
+*******************************************************/
+int random5050() {
+    return rand() & 1;
+}
+
+/*************************************************!
+* @function    sendMessageToChild
+* @abstract    inserts a message into the message
+*              queue for the child
+* @param       messageType
+**************************************************/
+void sendMessageToChild(int messageType) {
+    Message message;
+    static int messageSize = sizeof(Message) - sizeof(long);
+    message.messageType = messageType;
+    msgsnd(queueSharedMemId, &message, messageSize, 0);
+}
+
+
+/*************************************************!
+ * @function    receiveMessageFromChild
+ * @abstract    get the index from the array of
+ *              children... it'll be useful
+ * @param       pidIndex index of the pidIndex
+ * @returns     actual index from the pid array
+ **************************************************/
+void receiveMessageFromChild(int messageType) {
+    Message message;
+    static int messageSize = sizeof(Message) - sizeof(long);
+    msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);
+
+//    if (message.doneFlag) {
+//
+//    } else {
+//        userProcess[index].pidIndex = -1;
+//    }
 }
