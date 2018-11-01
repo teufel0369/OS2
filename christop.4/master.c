@@ -52,8 +52,11 @@ void processControlBlocksSetup();
 void pushToQueue(Queue*, int, char*);
 int random5050();
 int randomNumberGenerator(int, int);
+void receiveMessageFromChild(int);
+void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
+void userProcessesSetup();
 
 /*************************************************!
 * @function    main
@@ -116,12 +119,24 @@ int main(int argc, char **argv) {
     /* set up the shared memory clock */
     sharedMemoryClockSetup();
 
-    /* set up the process control blocks */
-    processControlBlocksSetup();
+    /* set up the user processes */
+    userProcessesSetup();
 
     /* set up the high and low priority queues */
     lowPriorityQueue = generateQueue(18);
     highPriorityQueue = generateQueue(18);
+
+    pid_t childPid;
+    char* childId = "";
+    if ((childPid = fork()) == 0) {
+        /* begin scheduling processes for execution */
+        sendMessageToChild(getpid());
+        sprintf(childId, "%d", getpid());
+        execl("./child", "./child", childId, NULL); /* exec it off */
+    } else if (childPid < 0) {
+        perror("[-]ERROR: Failed to fork CHILD process.\n");
+        exit(errno);
+    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -235,8 +250,6 @@ void signalHandlerMaster(int signo) {
 * @abstract    sets up the process control blocks
 *******************************************************/
 void processControlBlocksSetup() {
-    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
-    userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * 18);
 
     /* allocate some memory for the array of processes */
     pcb = (struct ProcessControlBlock*) malloc(sizeof(struct ProcessControlBlock) * 18);
@@ -253,11 +266,7 @@ void processControlBlocksSetup() {
     /* Initial the index and actual pid of the PCB */
     pcb = (PCB*) ((void*)pcbAddress+sizeof(int));
 
-    int i;
-    for(i = 0; i < 18; i++) {
-        userProcess[i].actualPid = -1;
-        userProcess[i].index = i;
-    }
+
 }
 
 /*******************************************************!
@@ -404,6 +413,7 @@ int random5050() {
 **************************************************/
 void sendMessageToChild(int messageType) {
     Message message;
+    message.message = "test test test from the parent";
     static int messageSize = sizeof(Message) - sizeof(long);
     message.messageType = messageType;
     msgsnd(queueSharedMemId, &message, messageSize, 0);
@@ -421,10 +431,21 @@ void receiveMessageFromChild(int messageType) {
     Message message;
     static int messageSize = sizeof(Message) - sizeof(long);
     msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);
-
-//    if (message.doneFlag) {
-//
-//    } else {
-//        userProcess[index].pidIndex = -1;
-//    }
 }
+
+/*************************************************!
+* @function    userProcessSetup
+* @abstract    sets up the user processes
+**************************************************/
+void userProcessesSetup() {
+    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
+    userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * 18);
+
+    int i;
+    for(i = 0; i < 18; i++) {
+        userProcess[i].actualPid = -1;
+        userProcess[i].index = i;
+    }
+}
+
+

@@ -3,8 +3,8 @@
 #define O2_THOMPSON_3_SHARED_H
 #define SHARED_MEM_CLOCK_KEY 1775
 #define SHARED_MEM_PCB_KEY 8541
-#define QUEUE_KEY 4604
-#define MASTER_ID 369
+#define QUEUE_KEY 1535
+#define PCB_KEY 2018
 
 #define DEFAULT_TIMER 20
 #define DEFAULT_FILENAME "log.out"
@@ -34,6 +34,7 @@ typedef struct Message {
     int progress;
     int seconds;
     int nanoSeconds;
+    char* message;
 } Message;
 
 typedef struct ProcessControlBlock {
@@ -41,6 +42,7 @@ typedef struct ProcessControlBlock {
     pid_t actualPid;
     int priority;
     int isBlocked;
+    char* message;
     int burstTime;
     int resumeTime;
     int duration;
