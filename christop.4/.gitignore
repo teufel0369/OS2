@@ -4,5 +4,3 @@ CMakeLists.txt
 *.o
 oss
 child
-*.pdf
-*.rtf

@@ -28,7 +28,7 @@ Queue* lowPriorityQueue;
 Queue* highPriorityQueue;
 
 /* GLOBAL MISC */
-char* fileName;
+char fileName[1000];
 char* pcbAddress;
 int indexCounter;
 int numChildren;
@@ -67,12 +67,13 @@ void userProcessesSetup();
 **************************************************/
 int main(int argc, char **argv) {
     srand(time(NULL));
-    int c, wait_status;
+    int c, i, wait_status;
+    char childId[10];
     char* lvalue = NULL;
     char* tvalue = NULL;
 
 
-    while ((c = getopt (argc, argv, "h l:t:")) != -1) {
+    while ((c = getopt (argc, argv, "h l::t::")) != -1) {
         switch (c) {
             case 'h':
                 displayHelp(1);
@@ -84,7 +85,7 @@ int main(int argc, char **argv) {
                 tvalue = optarg;
                 break;
             case '?':
-                if (optopt == 's' || optopt == 'l' || optopt == 't')
+                if (optopt == 'l' || optopt == 't')
                     fprintf (stderr, "Option -%c requires an argument.\n", optopt);
                 else
                     fprintf (stderr, "Unknown option character '%c'.\n", optopt);
@@ -119,6 +120,9 @@ int main(int argc, char **argv) {
     /* set up the shared memory clock */
     sharedMemoryClockSetup();
 
+    /* set up the shared memory process control blocks */
+    processControlBlocksSetup();
+
     /* set up the user processes */
     userProcessesSetup();
 
@@ -126,24 +130,30 @@ int main(int argc, char **argv) {
     lowPriorityQueue = generateQueue(18);
     highPriorityQueue = generateQueue(18);
 
-    pid_t childPid;
-    char* childId = "";
-    if ((childPid = fork()) == 0) {
-        /* begin scheduling processes for execution */
-        sendMessageToChild(getpid());
-        sprintf(childId, "%d", getpid());
-        execl("./child", "./child", childId, NULL); /* exec it off */
-    } else if (childPid < 0) {
+    int numProcesses = 0;
+
+//    for(i = 0; i < 18; i++) {
+    userProcess[0].actualPid = fork();
+
+    /* if this is the child process */
+    if (userProcess[0].actualPid == 0) {
+        sprintf(childId, "%d", userProcess[0].index);
+
+        /* exec it off */
+        execl("./child", "./child", childId, NULL);
+
+    } else if (userProcess[0].actualPid < 0) {
         perror("[-]ERROR: Failed to fork CHILD process.\n");
         exit(errno);
     }
+//    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
 
     /* detach and remove the message queue, shared memory, and any allocated memory */
-    free(pcb);
     detachAndRemove(sharedMemClockId, sharedMemClock);
+    detachAndRemove(pcbSharedMemId, pcb);
     msgctl(queueSharedMemId, IPC_RMID, NULL);
     return 0;
 }
@@ -250,23 +260,15 @@ void signalHandlerMaster(int signo) {
 * @abstract    sets up the process control blocks
 *******************************************************/
 void processControlBlocksSetup() {
-
-    /* allocate some memory for the array of processes */
-    pcb = (struct ProcessControlBlock*) malloc(sizeof(struct ProcessControlBlock) * 18);
-
     /* create Process Control Block shared memory segment */
-    if ((pcbSharedMemId = shmget(SHARED_MEM_PCB_KEY, sizeof(pcb), IPC_CREAT | 0600)) < 0) {
-        perror("[-]ERROR: Failed to create shared memory segment.");
+    size_t size = sizeof(struct ProcessControlBlock) * 18;
+    if ((pcbSharedMemId = shmget(SHARED_MEM_PCB_KEY, size, IPC_CREAT | 0600)) < 0) {
+        perror("[-]ERROR: Failed to create shared memory segment in master.");
         exit(errno);
     }
 
     /* attach the shared memory process control blocks */
-    pcbAddress = shmat(pcbSharedMemId, NULL, 0);
-
-    /* Initial the index and actual pid of the PCB */
-    pcb = (PCB*) ((void*)pcbAddress+sizeof(int));
-
-
+    pcb = shmat(pcbSharedMemId, NULL, 0);
 }
 
 /*******************************************************!
@@ -286,6 +288,21 @@ void sharedMemoryClockSetup() {
     /* initialize the shared memory clock */
     sharedMemClock->seconds = 0;
     sharedMemClock->nanoSeconds = 0;
+}
+
+/*************************************************!
+* @function    userProcessSetup
+* @abstract    sets up the user processes
+**************************************************/
+void userProcessesSetup() {
+    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
+    userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * 18);
+
+    int i;
+    for(i = 0; i < 18; i++) {
+        userProcess[i].actualPid = -1;
+        userProcess[i].index = i;
+    }
 }
 
 /*******************************************************!
@@ -414,7 +431,7 @@ int random5050() {
 void sendMessageToChild(int messageType) {
     Message message;
     message.message = "test test test from the parent";
-    static int messageSize = sizeof(Message) - sizeof(long);
+    static int messageSize = sizeof(Message);
     message.messageType = messageType;
     msgsnd(queueSharedMemId, &message, messageSize, 0);
 }
@@ -433,19 +450,6 @@ void receiveMessageFromChild(int messageType) {
     msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);
 }
 
-/*************************************************!
-* @function    userProcessSetup
-* @abstract    sets up the user processes
-**************************************************/
-void userProcessesSetup() {
-    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
-    userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * 18);
 
-    int i;
-    for(i = 0; i < 18; i++) {
-        userProcess[i].actualPid = -1;
-        userProcess[i].index = i;
-    }
-}
 
 

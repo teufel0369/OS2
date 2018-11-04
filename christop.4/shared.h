@@ -4,7 +4,8 @@
 #define SHARED_MEM_CLOCK_KEY 1775
 #define SHARED_MEM_PCB_KEY 8541
 #define QUEUE_KEY 1535
-#define PCB_KEY 2018
+#define MASTER_ID 369
+
 
 #define DEFAULT_TIMER 20
 #define DEFAULT_FILENAME "log.out"

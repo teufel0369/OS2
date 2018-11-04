@@ -13,12 +13,12 @@ int childId;
 int sharedMemId;
 int pcbMemId;
 int queueId;
-SharedMemClock *shm;
+SharedMemClock* shm;
 PCB* pcb;
 
 void signalHandlerChild(int);
 void sendMessageToMaster(int, int);
-void receiveMessageFromMaster(int);
+Message receiveMessageFromMaster(int);
 
 /*******************************************************!
 * @function    main
@@ -29,14 +29,14 @@ void receiveMessageFromMaster(int);
 *******************************************************/
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Error: Missing process Num.\n");
+        fprintf(stderr, "\n[-]ERROR: Missing process Num.\n");
         exit(1);
     }
     childId = atoi(argv[1]);
 
     /* register signal handler */
     if (signal(SIGINT, signalHandlerChild) == SIG_ERR) {
-        perror("Error: Couldn't catch SIGTERM.\n");
+        perror("\n[-]ERROR: Couldn't catch SIGTERM.\n");
         exit(errno);
     }
 
@@ -45,22 +45,25 @@ int main(int argc, char *argv[]) {
 
     /* access shared memory segment */
     if ((sharedMemId = shmget(SHARED_MEM_CLOCK_KEY, sizeof(SharedMemClock), 0600)) < 0) {
-        perror("Error: shmget");
+        perror("\n[-]ERROR: shmget failed on shared memory clock.");
         exit(errno);
     }
 
     /* attach shared memory */
     shm = shmat(sharedMemId, NULL, 0);
+    printf("\nChild %d attached to shared memory clock\n", childId);
 
-    /* setup shared memory for pcb */
-    pcbMemId = shmget(PCB_KEY, 2048, 0666);
-    if(pcbMemId < 0) {
-        perror("[-]ERROR: Creating PCB shared memory Failed!!\n");
-        exit(1);
+    /* access shared memory segment */
+    if ((pcbMemId = shmget(SHARED_MEM_PCB_KEY, sizeof(PCB), 0600)) < 0) {
+        perror("\n[-]ERROR: shmget failed on shared memory process control block in child\n");
+        exit(errno);
     }
-    pcb = (PCB* )shmat(pcbMemId, NULL, 0);
 
-    receiveMessageFromMaster(childId);
+    /* attach shared memory */
+    pcb = shmat(pcbMemId, NULL, 0);
+    printf("\nChild %d attached to shared memory process control block\n", childId);
+
+
     return 0;
 }
 
@@ -70,11 +73,11 @@ int main(int argc, char *argv[]) {
 * @abstract    removes a message from the message queue
 * @param       messageType
 *******************************************************/
-void receiveMessageFromMaster(int messageType) {
+Message receiveMessageFromMaster(int messageType) {
     Message message;
-    static int messageSize = sizeof(Message) - sizeof(long);
+    int messageSize = sizeof(Message);
     msgrcv(queueId, &message, messageSize, messageType, 0);
-    printf("%s", message.message);
+    return message;
 }
 
 /*******************************************************!
