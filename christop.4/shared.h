@@ -42,6 +42,7 @@ typedef struct ProcessControlBlock {
     int pidIndex;
     pid_t actualPid;
     int priority;
+    int isScheduled;
     int isBlocked;
     char* message;
     int burstTime;

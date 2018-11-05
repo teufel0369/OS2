@@ -52,7 +52,7 @@ void processControlBlocksSetup();
 void pushToQueue(Queue*, int, char*);
 int random5050();
 int randomNumberGenerator(int, int);
-void receiveMessageFromChild(int);
+Message receiveMessageFromChild(int);
 void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
@@ -131,22 +131,28 @@ int main(int argc, char **argv) {
     highPriorityQueue = generateQueue(18);
 
     int numProcesses = 0;
+    i = 0;
+    while(numProcesses < 18) {
+        userProcess[i].actualPid = fork();
 
-//    for(i = 0; i < 18; i++) {
-    userProcess[0].actualPid = fork();
+        /* if this is the child process */
+        if (userProcess[i].actualPid == 0) {
+            pcb[i].isScheduled = 1;
+            pcb[i].pidIndex = userProcess[i].index;
+            pcb[i].actualPid = getpid();
+            sprintf(childId, "%d", userProcess[i].index);
 
-    /* if this is the child process */
-    if (userProcess[0].actualPid == 0) {
-        sprintf(childId, "%d", userProcess[0].index);
+            /* exec it off */
+            execl("./child", "./child", childId, NULL);
 
-        /* exec it off */
-        execl("./child", "./child", childId, NULL);
+            i++;
+            numProcesses++;
 
-    } else if (userProcess[0].actualPid < 0) {
-        perror("[-]ERROR: Failed to fork CHILD process.\n");
-        exit(errno);
+        } else if (userProcess[0].actualPid < 0) {
+            perror("[-]ERROR: Failed to fork CHILD process.\n");
+            exit(errno);
+        }
     }
-//    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -444,7 +450,7 @@ void sendMessageToChild(int messageType) {
  * @param       pidIndex index of the pidIndex
  * @returns     actual index from the pid array
  **************************************************/
-void receiveMessageFromChild(int messageType) {
+Message receiveMessageFromChild(int messageType) {
     Message message;
     static int messageSize = sizeof(Message) - sizeof(long);
     msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);

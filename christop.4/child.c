@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* attach shared memory */
-    shm = shmat(sharedMemId, NULL, 0);
+    shm = (SharedMemClock*) shmat(sharedMemId, NULL, 0);
     printf("\nChild %d attached to shared memory clock\n", childId);
 
     /* access shared memory segment */
@@ -60,8 +60,17 @@ int main(int argc, char *argv[]) {
     }
 
     /* attach shared memory */
-    pcb = shmat(pcbMemId, NULL, 0);
+    pcb = (PCB*) shmat(pcbMemId, NULL, 0);
     printf("\nChild %d attached to shared memory process control block\n", childId);
+
+
+    while(1) {
+        if(pcb[childId].isScheduled == 1) {
+            printf("Child %d was scheduled", childId);
+            printf("Child %d has PID of %d and PPID of %d", childId, getpid(), getppid());
+            break;
+        }
+    }
 
 
     return 0;
@@ -89,4 +98,14 @@ Message receiveMessageFromMaster(int messageType) {
 *******************************************************/
 void signalHandlerChild(int signal) {
     exit(0);
+}
+
+/*******************************************************!
+* @function    random5050
+* @abstract    generates even or odd with equal
+*              probability
+* @return      returns 1 if odd, 0 if even
+*******************************************************/
+int random5050() {
+    return rand() & 1;
 }
