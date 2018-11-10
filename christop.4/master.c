@@ -40,10 +40,12 @@ int timerAmount;
 
 /* PROTOTYPES */
 void advanceSharedMemoryClock();
+int calculateTimeDifference(int);
 long checkLogFile(FILE*);
 void displayHelp(int);
 int detachAndRemove(int, void*);
 int determineQueuePlacement();
+void forkFirstProcess(pid_t, char*);
 Queue* generateQueue(unsigned int);
 int isQueueEmpty(Queue* queue);
 int isQueueFull(Queue*);
@@ -130,28 +132,51 @@ int main(int argc, char **argv) {
     lowPriorityQueue = generateQueue(18);
     highPriorityQueue = generateQueue(18);
 
-    int numProcesses = 0;
-    i = 0;
-    while(numProcesses < 18) {
-        userProcess[i].actualPid = fork();
+    pid_t childPid = 0;
+    int processCount = 0;
+    unsigned int previousClockTime = 0;
+    int spawnTime = 0;
+    int clockDifference;
 
-        /* if this is the child process */
-        if (userProcess[i].actualPid == 0) {
-            pcb[i].isScheduled = 1;
-            pcb[i].pidIndex = userProcess[i].index;
-            pcb[i].actualPid = getpid();
-            sprintf(childId, "%d", userProcess[i].index);
+    /* fork the first process in order to do the time comparisons */
+    forkFirstProcess(childPid, childId); //TODO: this is killing the rest of the program. Need to fix it.
 
-            /* exec it off */
-            execl("./child", "./child", childId, NULL);
+    while(processCount < 18) {
+        for(i = 0; i < 18; i++) {
+            spawnTime = randomNumberGenerator(2, 0);
 
-            i++;
-            numProcesses++;
+            if(calculateTimeDifference(previousClockTime) > spawnTime) {
+                childPid = fork();
 
-        } else if (userProcess[0].actualPid < 0) {
-            perror("[-]ERROR: Failed to fork CHILD process.\n");
-            exit(errno);
+                /* if this is the child process */
+                if(childPid == 0) {
+                    printf("%d", getpid());
+
+                    pcb[i].isScheduled = 1;
+                    pcb[i].pidIndex = i;
+                    pcb[i].actualPid = childPid;
+
+                    snprintf(childId, 10,"%d", i);
+
+                    /* exec it off */
+                    execl("./child", "./child", childId, NULL);
+
+                } else if (childPid < 0) {
+                    perror("[-]ERROR: Failed to fork CHILD process.\n");
+                    exit(errno);
+
+                }
+
+                /* increment process count */
+                processCount++;
+
+                previousClockTime = sharedMemClock->seconds;
+
+                /* advance the shared memory clock */
+                advanceSharedMemoryClock();
+            }
         }
+
     }
 
     /* wait for any remaining child processes to finish */
@@ -454,8 +479,47 @@ Message receiveMessageFromChild(int messageType) {
     Message message;
     static int messageSize = sizeof(Message) - sizeof(long);
     msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);
+    return message;
 }
 
+/*************************************************!
+ * @function    forkFirstProcess
+ * @abstract    forks the first process
+ * @param       childPid
+ * @param       childId
+ * @param       previousClockTime
+ * @param       processCount
+ **************************************************/
+void forkFirstProcess(pid_t childPid, char* childId) {
+    /* if this is the child process */
+    if(childPid > 0) {
+        printf("%d", getpid());
 
+        pcb[0].isScheduled = 1;
+        pcb[0].pidIndex = 0;
+        pcb[0].actualPid = childPid;
 
+    } else if (childPid < 0) {
+        perror("[-]ERROR: Failed to fork CHILD process.\n");
+        exit(errno);
 
+    } else {
+        snprintf(childId, 10,"%d", 0);
+
+        /* exec it off */
+        execl("./child", "./child", childId, NULL);
+
+        /* advance the shared memory clock */
+        advanceSharedMemoryClock();
+        advanceSharedMemoryClock();
+    }
+}
+
+/*************************************************!
+ * @function    calculateTimeDifference
+ * @abstract    calculates the time difference
+ * @return      timeDifference
+ **************************************************/
+int calculateTimeDifference(int previousTime) {
+    return sharedMemClock->seconds - previousTime;
+}

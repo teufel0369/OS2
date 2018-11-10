@@ -16,8 +16,9 @@ int queueId;
 SharedMemClock* shm;
 PCB* pcb;
 
-void signalHandlerChild(int);
 void sendMessageToMaster(int, int);
+void signalHandlerChild(int);
+int random5050();
 Message receiveMessageFromMaster(int);
 
 /*******************************************************!
@@ -45,7 +46,7 @@ int main(int argc, char *argv[]) {
 
     /* access shared memory segment */
     if ((sharedMemId = shmget(SHARED_MEM_CLOCK_KEY, sizeof(SharedMemClock), 0600)) < 0) {
-        perror("\n[-]ERROR: shmget failed on shared memory clock.");
+        perror("\n[-]ERROR: shmget failed on shared memory clock.\n");
         exit(errno);
     }
 
@@ -66,8 +67,9 @@ int main(int argc, char *argv[]) {
 
     while(1) {
         if(pcb[childId].isScheduled == 1) {
-            printf("Child %d was scheduled", childId);
-            printf("Child %d has PID of %d and PPID of %d", childId, getpid(), getppid());
+            printf("\nChild %d was scheduled\n", childId);
+            printf("\nChild %d has PID of %d and PPID of %d\n", childId, getpid(), getppid());
+            printf("\nShared memory clock current time: %d.%d\n", shm->seconds, shm->nanoSeconds);
             break;
         }
     }
