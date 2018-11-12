@@ -23,7 +23,6 @@
 /* GLOBAL STRUCTS */
 PCB* pcb;
 SharedMemClock* sharedMemClock;
-UserProcess* userProcess;
 Queue* lowPriorityQueue;
 Queue* highPriorityQueue;
 
@@ -47,6 +46,7 @@ int detachAndRemove(int, void*);
 int determineQueuePlacement();
 void forkFirstProcess(pid_t, char*);
 Queue* generateQueue(unsigned int);
+UserProcess initializeUserProcess(int);
 int isQueueEmpty(Queue* queue);
 int isQueueFull(Queue*);
 int popFromQueue(Queue*, char*);
@@ -58,7 +58,6 @@ Message receiveMessageFromChild(int);
 void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
-void userProcessesSetup();
 
 /*************************************************!
 * @function    main
@@ -125,9 +124,6 @@ int main(int argc, char **argv) {
     /* set up the shared memory process control blocks */
     processControlBlocksSetup();
 
-    /* set up the user processes */
-    userProcessesSetup();
-
     /* set up the high and low priority queues */
     lowPriorityQueue = generateQueue(18);
     highPriorityQueue = generateQueue(18);
@@ -138,20 +134,33 @@ int main(int argc, char **argv) {
     int spawnTime = 0;
     int clockDifference;
 
-    /* fork the first process in order to do the time comparisons */
-    forkFirstProcess(childPid, childId); //TODO: this is killing the rest of the program. Need to fix it.
-
-    while(processCount < 18) {
+    while(processCount <= 18) {
         for(i = 0; i < 18; i++) {
             spawnTime = randomNumberGenerator(2, 0);
 
-            if(calculateTimeDifference(previousClockTime) > spawnTime) {
+            if(i == 0) {
+                childPid = fork();
+
+                if(childPid == 0) {
+                    pcb[i].isScheduled = 1;
+                    pcb[i].pidIndex = i;
+                    pcb[i].actualPid = childPid;
+
+                    snprintf(childId, 10,"%d", i);
+
+                    /* exec it off */
+                    execl("./child", "./child", childId, NULL);
+
+                } else if (childPid < 0) {
+                    perror("[-]ERROR: Failed to fork CHILD process.\n");
+                    exit(errno);
+                }
+
+            } else if(calculateTimeDifference(previousClockTime) >= spawnTime) {
                 childPid = fork();
 
                 /* if this is the child process */
                 if(childPid == 0) {
-                    printf("%d", getpid());
-
                     pcb[i].isScheduled = 1;
                     pcb[i].pidIndex = i;
                     pcb[i].actualPid = childPid;
@@ -172,7 +181,6 @@ int main(int argc, char **argv) {
 
                 previousClockTime = sharedMemClock->seconds;
 
-                /* advance the shared memory clock */
                 advanceSharedMemoryClock();
             }
         }
@@ -324,16 +332,26 @@ void sharedMemoryClockSetup() {
 /*************************************************!
 * @function    userProcessSetup
 * @abstract    sets up the user processes
+* @param       index
+* @return      userProcess
 **************************************************/
-void userProcessesSetup() {
+UserProcess initializeUserProcess(int index) {
     /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
-    userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * 18);
+   UserProcess* userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess));
 
-    int i;
-    for(i = 0; i < 18; i++) {
-        userProcess[i].actualPid = -1;
-        userProcess[i].index = i;
-    }
+   userProcess->actualPid = getpid();
+   userProcess->index = index;
+   userProcess->priority = determineQueuePlacement();
+
+   /* calculate burst time */
+   /* burst time is how long the process gets to user the CPU */
+   if(random5050() == 0) {
+       userProcess->burstTime = QUANTUM_FULL;
+   } else {
+       userProcess->burstTime = randomNumberGenerator(QUANTUM_FULL, 0);
+   }
+
+    return *userProcess;
 }
 
 /*******************************************************!

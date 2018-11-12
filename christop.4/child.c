@@ -69,11 +69,10 @@ int main(int argc, char *argv[]) {
         if(pcb[childId].isScheduled == 1) {
             printf("\nChild %d was scheduled\n", childId);
             printf("\nChild %d has PID of %d and PPID of %d\n", childId, getpid(), getppid());
-            printf("\nShared memory clock current time: %d.%d\n", shm->seconds, shm->nanoSeconds);
+            printf("\nChild %d shared memory clock current time: %d.%d\n", childId, shm->seconds, shm->nanoSeconds);
             break;
         }
     }
-
 
     return 0;
 }

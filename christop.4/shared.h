@@ -59,6 +59,7 @@ typedef struct UserProcess {
     int progress;
     int burstTime;
 
+
 } UserProcess;
 
 typedef struct Queue {
@@ -67,6 +68,7 @@ typedef struct Queue {
     int rear;
     int size;
     unsigned int queueCapacity;
+    unsigned int quantum;
 } Queue;
 
 #endif //O2_THOMPSON_4_SHARED_H
