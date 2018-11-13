@@ -46,7 +46,7 @@ int detachAndRemove(int, void*);
 int determineQueuePlacement();
 void forkFirstProcess(pid_t, char*);
 Queue* generateQueue(unsigned int);
-UserProcess initializeUserProcess(int);
+UserProcess initializeUserProcess(int, pid_t);
 int isQueueEmpty(Queue* queue);
 int isQueueFull(Queue*);
 int popFromQueue(Queue*, char*);
@@ -58,6 +58,7 @@ Message receiveMessageFromChild(int);
 void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
+PCB transformUserProcessToPcb(PCB, UserProcess, int);
 
 /*************************************************!
 * @function    main
@@ -142,9 +143,10 @@ int main(int argc, char **argv) {
                 childPid = fork();
 
                 if(childPid == 0) {
+                    UserProcess userProcess = initializeUserProcess(i, childPid);
+                    pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
+
                     pcb[i].isScheduled = 1;
-                    pcb[i].pidIndex = i;
-                    pcb[i].actualPid = childPid;
 
                     snprintf(childId, 10,"%d", i);
 
@@ -161,9 +163,10 @@ int main(int argc, char **argv) {
 
                 /* if this is the child process */
                 if(childPid == 0) {
+                    UserProcess userProcess = initializeUserProcess(i, childPid);
+                    pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
+
                     pcb[i].isScheduled = 1;
-                    pcb[i].pidIndex = i;
-                    pcb[i].actualPid = childPid;
 
                     snprintf(childId, 10,"%d", i);
 
@@ -336,11 +339,11 @@ void sharedMemoryClockSetup() {
 * @param       index
 * @return      userProcess
 **************************************************/
-UserProcess initializeUserProcess(int index) {
+UserProcess initializeUserProcess(int index, pid_t childPid) {
     /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
    UserProcess* userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess));
 
-   userProcess->actualPid = getpid();
+   userProcess->actualPid = childPid;
    userProcess->index = index;
    userProcess->priority = determineQueuePlacement();
 
@@ -356,10 +359,12 @@ UserProcess initializeUserProcess(int index) {
    if(randNum == 0) {
        /* user process will just terminate */
        userProcess->duration = 0;
+       userProcess->waitTime = 0;
 
    } else if(randNum == 1) {
        /* user process will terminate at the time quantum based on it's priority */
        userProcess->duration = userProcess->priority == 0 ? QUANTUM_HALF : QUANTUM_FULL;
+       userProcess->waitTime = 0;
 
    } else if(randNum == 2) {
        /* user process will start by waiting for an event lasting r.s seconds */
@@ -380,12 +385,14 @@ UserProcess initializeUserProcess(int index) {
            totalNanos = millis * 100000;
        }
 
-       userProcess->duration = totalSeconds + totalNanos;
+       userProcess->waitTime = totalSeconds + totalNanos;
+       userProcess->duration = userProcess->priority == 0 ? QUANTUM_HALF : QUANTUM_FULL;
 
    } else if(randNum == 3) {
        /* user process will get preempted after using a percent p of it's time quantum */
        int percentP = randomNumberGenerator(99, 1);
        userProcess->duration = userProcess->burstTime - (percentP * userProcess->burstTime);
+       userProcess->waitTime = 0;
    }
 
     return *userProcess;
@@ -397,8 +404,14 @@ UserProcess initializeUserProcess(int index) {
 * @param       index
 * @return      pcb
 **************************************************/
-PCB transformUserProcessToPcb(PCB* pcb, UserProcess* userProcess) {
-
+PCB transformUserProcessToPcb(PCB pcb, UserProcess userProcess, int index) {
+    pcb.burstTime = userProcess.burstTime;
+    pcb.duration = userProcess.duration;
+    pcb.priority = userProcess.priority;
+    pcb.pidIndex = index;
+    pcb.actualPid = userProcess.actualPid;
+    pcb.waitTime = userProcess.waitTime;
+    return pcb;
 }
 
 /*******************************************************!
@@ -418,7 +431,6 @@ void advanceSharedMemoryClock() {
         tempVar = sharedMemClock->nanoSeconds - 999999999;
         sharedMemClock->seconds += 1;
         sharedMemClock->nanoSeconds = tempVar;
-
     }
 }
 

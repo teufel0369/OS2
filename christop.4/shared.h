@@ -2,7 +2,7 @@
 #ifndef O2_THOMPSON_3_SHARED_H
 #define O2_THOMPSON_3_SHARED_H
 #define SHARED_MEM_CLOCK_KEY 1775
-#define SHARED_MEM_PCB_KEY 8541
+#define SHARED_MEM_PCB_KEY 72912
 #define QUEUE_KEY 1535
 #define MASTER_ID 369
 
@@ -44,11 +44,11 @@ typedef struct ProcessControlBlock {
     int priority;
     int isScheduled;
     int isBlocked;
-    char* message;
     int burstTime;
     int resumeTime;
     int duration;
     int progress;
+    int waitTime;
 } PCB;
 
 typedef struct UserProcess {
@@ -58,7 +58,7 @@ typedef struct UserProcess {
     int duration;
     int progress;
     int burstTime;
-
+    int waitTime;
 } UserProcess;
 
 typedef struct Queue {
@@ -67,7 +67,6 @@ typedef struct Queue {
     int rear;
     int size;
     unsigned int queueCapacity;
-    unsigned int quantum;
 } Queue;
 
 #endif //O2_THOMPSON_4_SHARED_H
