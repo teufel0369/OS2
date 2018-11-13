@@ -59,6 +59,7 @@ void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
 PCB transformUserProcessToPcb(PCB, UserProcess, int);
+void queueByPriority(int, pid_t);
 
 /*************************************************!
 * @function    main
@@ -143,9 +144,18 @@ int main(int argc, char **argv) {
                 childPid = fork();
 
                 if(childPid == 0) {
-                    UserProcess userProcess = initializeUserProcess(i, childPid);
+
+                    //TODO: write to log files
+                    /* initialize the user process */
+                    UserProcess userProcess = initializeUserProcess(i, getpid());
+
+                    /* transform the user process into a process control block */
                     pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
 
+                    printf("\npriority: %d\nprocessID: %d\nindex: %d\n", pcb[i].priority, pcb[i].actualPid, pcb[i].pidIndex);
+
+                    /* determine which queue it should be placed in */
+                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
                     pcb[i].isScheduled = 1;
 
                     snprintf(childId, 10,"%d", i);
@@ -163,9 +173,18 @@ int main(int argc, char **argv) {
 
                 /* if this is the child process */
                 if(childPid == 0) {
-                    UserProcess userProcess = initializeUserProcess(i, childPid);
+
+                    //TODO: write to log files
+                    /* initialize the user process */
+                    UserProcess userProcess = initializeUserProcess(i, getpid());
+
+                    /* transform the user process into a process control block */
                     pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
 
+                    printf("\npriority: %d\nprocessID: %d\nindex: %d\n", pcb[i].priority, pcb[i].actualPid, pcb[i].pidIndex);
+
+                    /* determine which queue it should be placed in */
+                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
                     pcb[i].isScheduled = 1;
 
                     snprintf(childId, 10,"%d", i);
@@ -219,6 +238,20 @@ int detachAndRemove(int shmid, void *shmaddr) {
         return 0;
     errno = error;
     return -1;
+}
+
+/*************************************************!
+* @function    queueByPriority
+* @abstract    places the process in the appropriate
+*              queue
+* @param       pcb
+**************************************************/
+void queueByPriority(int priority, pid_t processId) {
+    if(priority == 0) {
+        pushToQueue(highPriorityQueue, processId, "HIGH");
+    } else {
+        pushToQueue(lowPriorityQueue, processId, "LOW");
+    }
 }
 
 /*************************************************!
@@ -486,7 +519,7 @@ void pushToQueue(struct Queue* queue, int item, char* priority) {
         queue->rear = (queue->rear+1)%queue->queueCapacity;
         queue->array[queue->rear] = item;
         queue->size += 1;
-        printf("\n%d was added to the %s priority queue\n", item, priority);
+        printf("\nChild %d was added to the %s priority queue\n", item, priority);
     }
 }
 
