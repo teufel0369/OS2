@@ -134,8 +134,8 @@ int main(int argc, char **argv) {
     int spawnTime = 0;
     int clockDifference;
 
-    while(processCount <= 18) {
-        for(i = 0; i < 18; i++) {
+    for(i = 0; i < 18; i++) {
+        if(processCount <= 18) {
             spawnTime = randomNumberGenerator(2, 0);
 
             if(i == 0) {
@@ -175,16 +175,17 @@ int main(int argc, char **argv) {
                     exit(errno);
 
                 }
-
-                /* increment process count */
-                processCount++;
-
-                previousClockTime = sharedMemClock->seconds;
-
-                advanceSharedMemoryClock();
             }
-        }
 
+            /* increment process count */
+            processCount++;
+
+            /* get the previous clock time */
+            previousClockTime = sharedMemClock->seconds;
+
+            /* increment shared memory clock */
+            advanceSharedMemoryClock();
+        }
     }
 
     /* wait for any remaining child processes to finish */
@@ -330,7 +331,7 @@ void sharedMemoryClockSetup() {
 }
 
 /*************************************************!
-* @function    userProcessSetup
+* @function    initializeUserProcess
 * @abstract    sets up the user processes
 * @param       index
 * @return      userProcess
@@ -351,7 +352,53 @@ UserProcess initializeUserProcess(int index) {
        userProcess->burstTime = randomNumberGenerator(QUANTUM_FULL, 0);
    }
 
+   int randNum = randomNumberGenerator(3, 0);
+   if(randNum == 0) {
+       /* user process will just terminate */
+       userProcess->duration = 0;
+
+   } else if(randNum == 1) {
+       /* user process will terminate at the time quantum based on it's priority */
+       userProcess->duration = userProcess->priority == 0 ? QUANTUM_HALF : QUANTUM_FULL;
+
+   } else if(randNum == 2) {
+       /* user process will start by waiting for an event lasting r.s seconds */
+       int seconds = randomNumberGenerator(5, 0);
+       int millis = randomNumberGenerator(1000, 0);
+       int totalSeconds = seconds * 1000000000;
+       int totalNanos = 0;
+       if((millis % 1000) == 0) {
+           totalNanos = millis * 100000000;
+
+       } else if((millis % 100) == 0) {
+           totalNanos = millis * 10000000;
+
+       } else if((millis % 10) == 0) {
+           totalNanos = millis * 1000000;
+
+       } else if((millis % 1) == 0) {
+           totalNanos = millis * 100000;
+       }
+
+       userProcess->duration = totalSeconds + totalNanos;
+
+   } else if(randNum == 3) {
+       /* user process will get preempted after using a percent p of it's time quantum */
+       int percentP = randomNumberGenerator(99, 1);
+       userProcess->duration = userProcess->burstTime - (percentP * userProcess->burstTime);
+   }
+
     return *userProcess;
+}
+
+/*************************************************!
+* @function    transformUserProcessToPcb
+* @abstract    transforms the user process
+* @param       index
+* @return      pcb
+**************************************************/
+PCB transformUserProcessToPcb(PCB* pcb, UserProcess* userProcess) {
+
 }
 
 /*******************************************************!
@@ -498,39 +545,6 @@ Message receiveMessageFromChild(int messageType) {
     static int messageSize = sizeof(Message) - sizeof(long);
     msgrcv(queueSharedMemId, &message, messageSize, messageType, 0);
     return message;
-}
-
-/*************************************************!
- * @function    forkFirstProcess
- * @abstract    forks the first process
- * @param       childPid
- * @param       childId
- * @param       previousClockTime
- * @param       processCount
- **************************************************/
-void forkFirstProcess(pid_t childPid, char* childId) {
-    /* if this is the child process */
-    if(childPid > 0) {
-        printf("%d", getpid());
-
-        pcb[0].isScheduled = 1;
-        pcb[0].pidIndex = 0;
-        pcb[0].actualPid = childPid;
-
-    } else if (childPid < 0) {
-        perror("[-]ERROR: Failed to fork CHILD process.\n");
-        exit(errno);
-
-    } else {
-        snprintf(childId, 10,"%d", 0);
-
-        /* exec it off */
-        execl("./child", "./child", childId, NULL);
-
-        /* advance the shared memory clock */
-        advanceSharedMemoryClock();
-        advanceSharedMemoryClock();
-    }
 }
 
 /*************************************************!

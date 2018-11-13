@@ -59,7 +59,6 @@ typedef struct UserProcess {
     int progress;
     int burstTime;
 
-
 } UserProcess;
 
 typedef struct Queue {
