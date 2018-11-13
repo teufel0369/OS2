@@ -146,6 +146,7 @@ int main(int argc, char **argv) {
                 if(childPid == 0) {
 
                     //TODO: write to log files
+                    //TODO: need to add message queueing on sheduled and done flags
                     /* initialize the user process */
                     UserProcess userProcess = initializeUserProcess(i, getpid());
 
@@ -175,6 +176,7 @@ int main(int argc, char **argv) {
                 if(childPid == 0) {
 
                     //TODO: write to log files
+                    //TODO: need to add message queueing on sheduled and done flags
                     /* initialize the user process */
                     UserProcess userProcess = initializeUserProcess(i, getpid());
 

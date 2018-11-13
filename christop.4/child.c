@@ -67,6 +67,7 @@ int main(int argc, char *argv[]) {
 
     while(1) {
         if(pcb[childId].isScheduled == 1) {
+            //TODO: need to add message queueing on scheduled and done
             printf("\nChild %d was scheduled\n", childId);
             printf("\nChild %d has PID of %d and PPID of %d\n", childId, getpid(), getppid());
             printf("\nChild %d shared memory clock current time: %d.%d\n", childId, shm->seconds, shm->nanoSeconds);
