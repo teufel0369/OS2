@@ -4,3 +4,4 @@ CMakeLists.txt
 *.o
 oss
 child
+*.out

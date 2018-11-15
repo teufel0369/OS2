@@ -30,6 +30,7 @@ Queue* highPriorityQueue;
 char fileName[1000];
 char* pcbAddress;
 int indexCounter;
+FILE* logfile;
 int numChildren;
 int numTerminated;
 int pcbSharedMemId;
@@ -46,9 +47,11 @@ int detachAndRemove(int, void*);
 int determineQueuePlacement();
 void forkFirstProcess(pid_t, char*);
 Queue* generateQueue(unsigned int);
+char* highOrLowString(int);
 UserProcess initializeUserProcess(int, pid_t);
 int isQueueEmpty(Queue* queue);
 int isQueueFull(Queue*);
+PCB matchByPid(pid_t);
 int popFromQueue(Queue*, char*);
 void processControlBlocksSetup();
 void pushToQueue(Queue*, int, char*);
@@ -135,9 +138,14 @@ int main(int argc, char **argv) {
     unsigned int previousClockTime = 0;
     int spawnTime = 0;
     int clockDifference;
+    char* priorityString = "";
+    unsigned int totalTimeSeconds = 0;
+    unsigned int startTimeNanos = 0;
+    unsigned int totalTimeNanos = 0;
 
+    logfile = fopen(fileName, "a");
     for(i = 0; i < 18; i++) {
-        if(processCount <= 18) {
+        if(processCount <= 100) {
             spawnTime = randomNumberGenerator(2, 0);
 
             if(i == 0) {
@@ -153,13 +161,22 @@ int main(int argc, char **argv) {
                     /* transform the user process into a process control block */
                     pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
 
-                    printf("\npriority: %d\nprocessID: %d\nindex: %d\n", pcb[i].priority, pcb[i].actualPid, pcb[i].pidIndex);
+                    /* place in queue by priority */
+                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
 
                     /* determine which queue it should be placed in */
                     queueByPriority(pcb[i].priority, pcb[i].actualPid);
+
+                    /* get the priority string */
+                    priorityString = highOrLowString(pcb[i].priority);
+
+                    fprintf(stderr, "\nOSS: Generating process with PID %d %s and putting it in %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+
                     pcb[i].isScheduled = 1;
 
                     snprintf(childId, 10,"%d", i);
+                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                    startTimeNanos = sharedMemClock->nanoSeconds;
 
                     /* exec it off */
                     execl("./child", "./child", childId, NULL);
@@ -183,13 +200,20 @@ int main(int argc, char **argv) {
                     /* transform the user process into a process control block */
                     pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
 
-                    printf("\npriority: %d\nprocessID: %d\nindex: %d\n", pcb[i].priority, pcb[i].actualPid, pcb[i].pidIndex);
-
                     /* determine which queue it should be placed in */
                     queueByPriority(pcb[i].priority, pcb[i].actualPid);
+
+                    /* get the priority string */
+                    priorityString = highOrLowString(pcb[i].priority);
+
+                    fprintf(stderr, "\nOSS: Generating process with PID %d %s and putting it in %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+
                     pcb[i].isScheduled = 1;
 
                     snprintf(childId, 10,"%d", i);
+
+                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                    startTimeNanos = sharedMemClock->nanoSeconds;
 
                     /* exec it off */
                     execl("./child", "./child", childId, NULL);
@@ -197,9 +221,11 @@ int main(int argc, char **argv) {
                 } else if (childPid < 0) {
                     perror("[-]ERROR: Failed to fork CHILD process.\n");
                     exit(errno);
-
                 }
             }
+
+            totalTimeNanos = sharedMemClock->nanoSeconds - startTimeNanos;
+            fprintf(stderr, "\nOSS: total time this dispatch was %d nanoseconds\n", totalTimeNanos);
 
             /* increment process count */
             processCount++;
@@ -250,9 +276,17 @@ int detachAndRemove(int shmid, void *shmaddr) {
 **************************************************/
 void queueByPriority(int priority, pid_t processId) {
     if(priority == 0) {
-        pushToQueue(highPriorityQueue, processId, "HIGH");
+        if(!isQueueFull(highPriorityQueue)) {
+            pushToQueue(highPriorityQueue, processId, "HIGH");
+        } else {
+            fprintf(stderr, "OSS: HIGH priority queue is full");
+        }
     } else {
-        pushToQueue(lowPriorityQueue, processId, "LOW");
+        if(!isQueueFull(lowPriorityQueue)) {
+            pushToQueue(lowPriorityQueue, processId, "LOW");
+        } else {
+            fprintf(stderr, "OSS: LOW priority queue is full");
+        }
     }
 }
 
@@ -425,7 +459,7 @@ UserProcess initializeUserProcess(int index, pid_t childPid) {
 
    } else if(randNum == 3) {
        /* user process will get preempted after using a percent p of it's time quantum */
-       int percentP = randomNumberGenerator(99, 1);
+       double percentP = randomNumberGenerator(99, 1) / 100;
        userProcess->duration = userProcess->burstTime - (percentP * userProcess->burstTime);
        userProcess->waitTime = 0;
    }
@@ -521,7 +555,6 @@ void pushToQueue(struct Queue* queue, int item, char* priority) {
         queue->rear = (queue->rear+1)%queue->queueCapacity;
         queue->array[queue->rear] = item;
         queue->size += 1;
-        printf("\nChild %d was added to the %s priority queue\n", item, priority);
     }
 }
 
@@ -539,15 +572,14 @@ int popFromQueue(Queue* queue, char* priority) {
         int item = queue->array[queue->front];
         queue->front = (queue->front + 1)%queue->queueCapacity;
         queue->size = queue->size - 1;
-        printf("\n%d was popped from the %s priority queue\n", item, priority);
         return item;
     }
 }
 
 /*******************************************************!
 * @function    determineQueuePlacement
-* @abstract    determines the probability of queue
-*              placement
+* @abstract    returns 1 with 75% probability or 0 with
+*              25% probability
 * @param       queue
 * @return      1 or 0
 *******************************************************/
@@ -601,4 +633,35 @@ Message receiveMessageFromChild(int messageType) {
  **************************************************/
 int calculateTimeDifference(int previousTime) {
     return sharedMemClock->seconds - previousTime;
+}
+
+/*************************************************!
+ * @function    highOrLowString
+ * @abstract    returns the string based on priority
+ * @return      priority string
+ **************************************************/
+char* highOrLowString(int priority) {
+    char* highPriorityString = "(High Priority)";
+    char* lowPriorityString = "(Low Priority)";
+
+    return priority == 0 ? highPriorityString : lowPriorityString;
+}
+
+/*************************************************!
+ * @function    matchByPid
+ * @abstract    returns the PCB with same pid
+ * @return      pcb
+ **************************************************/
+PCB matchByPid(pid_t pid) {
+    size_t pcbSize = sizeof(pcb) / sizeof(pcb[0]);
+    int i = 0;
+    PCB elementToReturn;
+
+    for(i = 0; i < pcbSize; i++) {
+        if(pcb[i].actualPid == pid) {
+            elementToReturn = pcb[i];
+        }
+    }
+
+    return elementToReturn;
 }
