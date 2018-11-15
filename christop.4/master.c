@@ -51,10 +51,10 @@ char* highOrLowString(int);
 UserProcess initializeUserProcess(int, pid_t);
 int isQueueEmpty(Queue* queue);
 int isQueueFull(Queue*);
-PCB matchByPid(pid_t);
-int popFromQueue(Queue*, char*);
+int matchByPid(int);
+PCB popFromQueue(Queue*);
 void processControlBlocksSetup();
-void pushToQueue(Queue*, int, char*);
+void pushToQueue(Queue*, PCB);
 int random5050();
 int randomNumberGenerator(int, int);
 Message receiveMessageFromChild(int);
@@ -62,7 +62,7 @@ void sendMessageToChild(int);
 void sharedMemoryClockSetup();
 void signalHandlerMaster(int);
 PCB transformUserProcessToPcb(PCB, UserProcess, int);
-void queueByPriority(int, pid_t);
+void queueByPriority(PCB);
 
 /*************************************************!
 * @function    main
@@ -145,75 +145,31 @@ int main(int argc, char **argv) {
 
     logfile = fopen(fileName, "a");
     for(i = 0; i < 18; i++) {
-        if(processCount <= 100) {
+        if(processCount <= 18) {
             spawnTime = randomNumberGenerator(2, 0);
-
-            if(i == 0) {
-                childPid = fork();
-
-                if(childPid == 0) {
-
-                    //TODO: write to log files
-                    //TODO: need to add message queueing on sheduled and done flags
-                    /* initialize the user process */
-                    UserProcess userProcess = initializeUserProcess(i, getpid());
-
-                    /* transform the user process into a process control block */
-                    pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
-
-                    /* place in queue by priority */
-                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
-
-                    /* determine which queue it should be placed in */
-                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
-
-                    /* get the priority string */
-                    priorityString = highOrLowString(pcb[i].priority);
-
-                    fprintf(stderr, "\nOSS: Generating process with PID %d %s and putting it in %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-
-                    pcb[i].isScheduled = 1;
-
-                    snprintf(childId, 10,"%d", i);
-                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-                    startTimeNanos = sharedMemClock->nanoSeconds;
-
-                    /* exec it off */
-                    execl("./child", "./child", childId, NULL);
-
-                } else if (childPid < 0) {
-                    perror("[-]ERROR: Failed to fork CHILD process.\n");
-                    exit(errno);
-                }
-
-            } else if(calculateTimeDifference(previousClockTime) >= spawnTime) {
+            if(calculateTimeDifference(previousClockTime) >= spawnTime) {
                 childPid = fork();
 
                 /* if this is the child process */
                 if(childPid == 0) {
-
-                    //TODO: write to log files
-                    //TODO: need to add message queueing on sheduled and done flags
                     /* initialize the user process */
                     UserProcess userProcess = initializeUserProcess(i, getpid());
 
                     /* transform the user process into a process control block */
                     pcb[i] = transformUserProcessToPcb(pcb[i], userProcess, i);
 
+                    fprintf(stderr, "\nOSS: Generating process with PID %d %s and putting it in %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+
                     /* determine which queue it should be placed in */
-                    queueByPriority(pcb[i].priority, pcb[i].actualPid);
+                    queueByPriority(pcb[i]);
 
                     /* get the priority string */
                     priorityString = highOrLowString(pcb[i].priority);
 
-                    fprintf(stderr, "\nOSS: Generating process with PID %d %s and putting it in %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-
+                    snprintf(childId, 10,"%d", pcb[i].pidIndex);
                     pcb[i].isScheduled = 1;
-
-                    snprintf(childId, 10,"%d", i);
-
-                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
                     startTimeNanos = sharedMemClock->nanoSeconds;
+                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
 
                     /* exec it off */
                     execl("./child", "./child", childId, NULL);
@@ -224,14 +180,14 @@ int main(int argc, char **argv) {
                 }
             }
 
-            totalTimeNanos = sharedMemClock->nanoSeconds - startTimeNanos;
-            fprintf(stderr, "\nOSS: total time this dispatch was %d nanoseconds\n", totalTimeNanos);
-
             /* increment process count */
             processCount++;
 
             /* get the previous clock time */
             previousClockTime = sharedMemClock->seconds;
+
+            totalTimeNanos = sharedMemClock->nanoSeconds - startTimeNanos;
+            fprintf(stderr, "\nOSS: Child %d total time this dispatch was %d nanoseconds\n", pcb[i].pidIndex, totalTimeNanos);
 
             /* increment shared memory clock */
             advanceSharedMemoryClock();
@@ -274,16 +230,16 @@ int detachAndRemove(int shmid, void *shmaddr) {
 *              queue
 * @param       pcb
 **************************************************/
-void queueByPriority(int priority, pid_t processId) {
-    if(priority == 0) {
+void queueByPriority(PCB pcb) {
+    if(pcb.priority == 0) {
         if(!isQueueFull(highPriorityQueue)) {
-            pushToQueue(highPriorityQueue, processId, "HIGH");
+            pushToQueue(highPriorityQueue, pcb);
         } else {
             fprintf(stderr, "OSS: HIGH priority queue is full");
         }
     } else {
         if(!isQueueFull(lowPriorityQueue)) {
-            pushToQueue(lowPriorityQueue, processId, "LOW");
+            pushToQueue(lowPriorityQueue, pcb);
         } else {
             fprintf(stderr, "OSS: LOW priority queue is full");
         }
@@ -515,7 +471,7 @@ struct Queue* generateQueue(unsigned int capacity) {
     queue->queueCapacity = capacity;
     queue->front = queue->size = 0;
     queue->rear = capacity - 1;
-    queue->array = (int*)malloc(queue->queueCapacity * sizeof(int));
+    queue->array = (PCB*)malloc(queue->queueCapacity * sizeof(PCB));
     return queue;
 }
 
@@ -547,7 +503,7 @@ int isQueueEmpty(Queue* queue) {
 * @param       item
 * @param       priority
 *******************************************************/
-void pushToQueue(struct Queue* queue, int item, char* priority) {
+void pushToQueue(struct Queue* queue, PCB item) {
     if(isQueueFull(queue)) {
         return;
     }
@@ -564,15 +520,16 @@ void pushToQueue(struct Queue* queue, int item, char* priority) {
 * @param       queue
 * @return      item
 *******************************************************/
-int popFromQueue(Queue* queue, char* priority) {
+PCB popFromQueue(Queue* queue) {
+    PCB* item = NULL;
     if(isQueueEmpty(queue)) {
-        return 0;
+        return *item;
     }
     else {
-        int item = queue->array[queue->front];
+        *item = queue->array[queue->front];
         queue->front = (queue->front + 1)%queue->queueCapacity;
         queue->size = queue->size - 1;
-        return item;
+        return *item;
     }
 }
 
@@ -652,14 +609,14 @@ char* highOrLowString(int priority) {
  * @abstract    returns the PCB with same pid
  * @return      pcb
  **************************************************/
-PCB matchByPid(pid_t pid) {
+int matchByPid(int pid) {
     size_t pcbSize = sizeof(pcb) / sizeof(pcb[0]);
     int i = 0;
-    PCB elementToReturn;
+    int elementToReturn = 0;
 
     for(i = 0; i < pcbSize; i++) {
         if(pcb[i].actualPid == pid) {
-            elementToReturn = pcb[i];
+            elementToReturn = pcb[i].pidIndex;
         }
     }
 

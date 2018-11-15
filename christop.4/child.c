@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
             printf("\nChild %d was scheduled\n", childId);
             printf("\nChild %d has PID of %d and PPID of %d\n", childId, getpid(), getppid());
             printf("\nChild %d shared memory clock current time: %d.%d\n", childId, shm->seconds, shm->nanoSeconds);
+
             break;
         }
     }

@@ -62,7 +62,7 @@ typedef struct UserProcess {
 } UserProcess;
 
 typedef struct Queue {
-    int* array;
+    PCB* array;
     int front;
     int rear;
     int size;
