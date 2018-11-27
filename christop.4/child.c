@@ -71,6 +71,7 @@ int main(int argc, char *argv[]) {
             printf("\nChild %d was scheduled\n", childId);
             printf("\nChild %d has PID of %d and PPID of %d\n", childId, getpid(), getppid());
             printf("\nChild %d shared memory clock current time: %d.%d\n", childId, shm->seconds, shm->nanoSeconds);
+            sendMessageToMaster(MASTER_ID, 1);
 
             break;
         }
@@ -111,4 +112,21 @@ void signalHandlerChild(int signal) {
 *******************************************************/
 int random5050() {
     return rand() & 1;
+}
+
+/*******************************************************!
+* @function    sendMessageToMaster
+* @abstract    inserts a message into the message queue
+* @param       messageType
+* @param       isDone
+*******************************************************/
+void sendMessageToMaster(int messageType, int isdone) {
+    Message message;
+    size_t messageSize = sizeof(Message) - sizeof(long);
+    message.messageType = messageType;
+    message.childId = childId;
+    message.doneFlag = isdone;
+    message.seconds = shm->seconds;
+    message.nanoSeconds = shm->nanoSeconds;
+    msgsnd(queueId, &message, messageSize, 0);
 }

@@ -166,14 +166,6 @@ int main(int argc, char **argv) {
                     /* get the priority string */
                     priorityString = highOrLowString(pcb[i].priority);
 
-                    snprintf(childId, 10,"%d", pcb[i].pidIndex);
-                    pcb[i].isScheduled = 1;
-                    startTimeNanos = sharedMemClock->nanoSeconds;
-                    fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", pcb[i].actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-
-                    /* exec it off */
-                    execl("./child", "./child", childId, NULL);
-
                 } else if (childPid < 0) {
                     perror("[-]ERROR: Failed to fork CHILD process.\n");
                     exit(errno);
@@ -192,6 +184,40 @@ int main(int argc, char **argv) {
             /* increment shared memory clock */
             advanceSharedMemoryClock();
         }
+    }
+
+    while(!isQueueEmpty(highPriorityQueue) || !isQueueEmpty(lowPriorityQueue)) {
+        PCB poppedPcb;
+        Message message = receiveMessageFromChild(MASTER_ID);
+        if(message.doneFlag == 1) {
+            pcb[message.childId].isScheduled = 0;
+        }
+
+        if(!isQueueEmpty(highPriorityQueue)) {
+            PCB poppedPcb = popFromQueue(highPriorityQueue);
+            snprintf(childId, 10,"%d", poppedPcb.pidIndex);
+            pcb[i].isScheduled = 1;
+            startTimeNanos = sharedMemClock->nanoSeconds;
+            fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", poppedPcb.actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+            /* exec it off */
+            execl("./child", "./child", childId, NULL);
+        } else if(!isQueueEmpty(lowPriorityQueue)) {
+            poppedPcb = popFromQueue(highPriorityQueue);
+            snprintf(childId, 10,"%d", poppedPcb.pidIndex);
+            pcb[i].isScheduled = 1;
+            startTimeNanos = sharedMemClock->nanoSeconds;
+            fprintf(stderr, "\nOSS: Dispatching process with PID %d from %s queue at time %d.%d\n", poppedPcb.actualPid, priorityString, sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+            /* exec it off */
+            execl("./child", "./child", childId, NULL);
+        }
+
+        if(isQueueEmpty(lowPriorityQueue) && isQueueEmpty(highPriorityQueue)) {
+            break;
+        }
+
+        totalTimeNanos = sharedMemClock->nanoSeconds - startTimeNanos;
+        fprintf(stderr, "\nOSS: Child %d total time this dispatch was %d nanoseconds\n", poppedPcb.pidIndex, totalTimeNanos);
+        advanceSharedMemoryClock();
     }
 
     /* wait for any remaining child processes to finish */
