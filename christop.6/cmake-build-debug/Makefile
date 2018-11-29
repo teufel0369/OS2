@@ -123,32 +123,59 @@ christop_6/fast:
 	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/build
 .PHONY : christop_6/fast
 
-main.o: main.c.o
+child.o: child.c.o
 
-.PHONY : main.o
+.PHONY : child.o
 
 # target to build an object file
-main.c.o:
-	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/main.c.o
-.PHONY : main.c.o
+child.c.o:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/child.c.o
+.PHONY : child.c.o
 
-main.i: main.c.i
+child.i: child.c.i
 
-.PHONY : main.i
+.PHONY : child.i
 
 # target to preprocess a source file
-main.c.i:
-	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/main.c.i
-.PHONY : main.c.i
+child.c.i:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/child.c.i
+.PHONY : child.c.i
 
-main.s: main.c.s
+child.s: child.c.s
 
-.PHONY : main.s
+.PHONY : child.s
 
 # target to generate assembly for a file
-main.c.s:
-	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/main.c.s
-.PHONY : main.c.s
+child.c.s:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/child.c.s
+.PHONY : child.c.s
+
+master.o: master.c.o
+
+.PHONY : master.o
+
+# target to build an object file
+master.c.o:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/master.c.o
+.PHONY : master.c.o
+
+master.i: master.c.i
+
+.PHONY : master.i
+
+# target to preprocess a source file
+master.c.i:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/master.c.i
+.PHONY : master.c.i
+
+master.s: master.c.s
+
+.PHONY : master.s
+
+# target to generate assembly for a file
+master.c.s:
+	$(MAKE) -f CMakeFiles/christop_6.dir/build.make CMakeFiles/christop_6.dir/master.c.s
+.PHONY : master.c.s
 
 # Help Target
 help:
@@ -159,9 +186,12 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... edit_cache"
 	@echo "... christop_6"
-	@echo "... main.o"
-	@echo "... main.i"
-	@echo "... main.s"
+	@echo "... child.o"
+	@echo "... child.i"
+	@echo "... child.s"
+	@echo "... master.o"
+	@echo "... master.i"
+	@echo "... master.s"
 .PHONY : help
 
 

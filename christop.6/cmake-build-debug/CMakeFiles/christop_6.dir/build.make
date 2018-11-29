@@ -57,30 +57,45 @@ include CMakeFiles/christop_6.dir/progress.make
 # Include the compile flags for this target's objects.
 include CMakeFiles/christop_6.dir/flags.make
 
-CMakeFiles/christop_6.dir/main.c.o: CMakeFiles/christop_6.dir/flags.make
-CMakeFiles/christop_6.dir/main.c.o: ../main.c
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/Users/christhompson/Desktop/OS2/christop.6/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object CMakeFiles/christop_6.dir/main.c.o"
-	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/christop_6.dir/main.c.o   -c /Users/christhompson/Desktop/OS2/christop.6/main.c
+CMakeFiles/christop_6.dir/master.c.o: CMakeFiles/christop_6.dir/flags.make
+CMakeFiles/christop_6.dir/master.c.o: ../master.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/Users/christhompson/Desktop/OS2/christop.6/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building C object CMakeFiles/christop_6.dir/master.c.o"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/christop_6.dir/master.c.o   -c /Users/christhompson/Desktop/OS2/christop.6/master.c
 
-CMakeFiles/christop_6.dir/main.c.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/christop_6.dir/main.c.i"
-	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/christhompson/Desktop/OS2/christop.6/main.c > CMakeFiles/christop_6.dir/main.c.i
+CMakeFiles/christop_6.dir/master.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/christop_6.dir/master.c.i"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/christhompson/Desktop/OS2/christop.6/master.c > CMakeFiles/christop_6.dir/master.c.i
 
-CMakeFiles/christop_6.dir/main.c.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/christop_6.dir/main.c.s"
-	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/christhompson/Desktop/OS2/christop.6/main.c -o CMakeFiles/christop_6.dir/main.c.s
+CMakeFiles/christop_6.dir/master.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/christop_6.dir/master.c.s"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/christhompson/Desktop/OS2/christop.6/master.c -o CMakeFiles/christop_6.dir/master.c.s
+
+CMakeFiles/christop_6.dir/child.c.o: CMakeFiles/christop_6.dir/flags.make
+CMakeFiles/christop_6.dir/child.c.o: ../child.c
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/Users/christhompson/Desktop/OS2/christop.6/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building C object CMakeFiles/christop_6.dir/child.c.o"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -o CMakeFiles/christop_6.dir/child.c.o   -c /Users/christhompson/Desktop/OS2/christop.6/child.c
+
+CMakeFiles/christop_6.dir/child.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing C source to CMakeFiles/christop_6.dir/child.c.i"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/christhompson/Desktop/OS2/christop.6/child.c > CMakeFiles/christop_6.dir/child.c.i
+
+CMakeFiles/christop_6.dir/child.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling C source to assembly CMakeFiles/christop_6.dir/child.c.s"
+	/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/christhompson/Desktop/OS2/christop.6/child.c -o CMakeFiles/christop_6.dir/child.c.s
 
 # Object files for target christop_6
 christop_6_OBJECTS = \
-"CMakeFiles/christop_6.dir/main.c.o"
+"CMakeFiles/christop_6.dir/master.c.o" \
+"CMakeFiles/christop_6.dir/child.c.o"
 
 # External object files for target christop_6
 christop_6_EXTERNAL_OBJECTS =
 
-christop_6: CMakeFiles/christop_6.dir/main.c.o
+christop_6: CMakeFiles/christop_6.dir/master.c.o
+christop_6: CMakeFiles/christop_6.dir/child.c.o
 christop_6: CMakeFiles/christop_6.dir/build.make
 christop_6: CMakeFiles/christop_6.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/Users/christhompson/Desktop/OS2/christop.6/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking C executable christop_6"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/Users/christhompson/Desktop/OS2/christop.6/cmake-build-debug/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Linking C executable christop_6"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/christop_6.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

@@ -7,10 +7,7 @@
 #define MASTER_ID 369
 
 
-#define DEFAULT_TIMER 20
-#define DEFAULT_FILENAME "log.out"
-#define QUANTUM_FULL 1000000
-#define QUANTUM_HALF 500000
+#define DEFAULT_NUM_PROCESSES 20
 
 #include <stdlib.h>
 
@@ -19,37 +16,7 @@ typedef struct SharedClock {
     unsigned int nanoSeconds;
 } SharedMemClock;
 
-typedef struct Message {
-    long messageType;
-    int childId;
-    int doneFlag;
-    int index;
-    int resumeTime;
-    int burstTime;
-    int completeFlag;
-    int blockFlag;
-    int moveFlag;
-    int terminateFlag;
-    int priority;
-    int duration;
-    int progress;
-    int seconds;
-    int nanoSeconds;
-    char* message;
-} Message;
 
-typedef struct ProcessControlBlock {
-    int pidIndex;
-    pid_t actualPid;
-    int priority;
-    int isScheduled;
-    int isBlocked;
-    int burstTime;
-    int resumeTime;
-    int duration;
-    int progress;
-    int waitTime;
-} PCB;
 
 typedef struct UserProcess {
     int index;
@@ -62,11 +29,43 @@ typedef struct UserProcess {
 } UserProcess;
 
 typedef struct Queue {
-    PCB* array;
+    UserProcess* array;
     int front;
     int rear;
     int size;
     unsigned int queueCapacity;
 } Queue;
+
+typedef struct Pages {
+    int occupied;
+    int dirty;
+    int location;
+} Pages;
+
+typedef struct PageTable {
+    Pages pages[18][32];
+} PageTable;
+
+typedef struct Reference {
+    int pageNumber;
+    int offset;
+} Reference;
+
+typedef struct Message {
+    long type;
+    long pid;
+    int index;
+    int dirty;
+    int terminate;
+    Reference ref;
+} Message;
+
+typedef struct Frames {
+    int dirty;
+    int index;
+    int used;
+    int pageNumber;
+    int offset;
+} Frames;
 
 #endif //O2_THOMPSON_4_SHARED_H

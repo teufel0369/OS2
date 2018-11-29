@@ -12,10 +12,9 @@
 
 
 /* GLOBAL STRUCTS */
-PCB* pcb;
 SharedMemClock* sharedMemClock;
-Queue* lowPriorityQueue;
-Queue* highPriorityQueue;
+UserProcess* userProcess;
+Queue* queue;
 
 /* GLOBAL MISC */
 char fileName[1000];
@@ -33,29 +32,29 @@ int timerAmount;
 void displayHelp(int);
 void signalHandlerMaster(int);
 int detachAndRemove(int, void*);
+PageTable initializePageTable();
+void sharedMemoryClockSetup();
+UserProcess* initializeUserProcess(int);
+int randomNumberGenerator(int, int);
 
 
 int main(int argc, char **argv) {
     srand(time(NULL));
     int c, i, wait_status;
     char childId[10];
-    char* lvalue = NULL;
-    char* tvalue = NULL;
+    char* nvalue = NULL;
+    int numProcesses;
 
-
-    while ((c = getopt (argc, argv, "h l::t::")) != -1) {
+    while ((c = getopt (argc, argv, "h n::")) != -1) {
         switch (c) {
             case 'h':
                 displayHelp(1);
                 break;
-            case 'l':
-                lvalue = optarg;
-                break;
-            case 't':
-                tvalue = optarg;
+            case 'n':
+                nvalue = optarg;
                 break;
             case '?':
-                if (optopt == 'l' || optopt == 't')
+                if (optopt == 'n')
                     fprintf (stderr, "Option -%c requires an argument.\n", optopt);
                 else
                     fprintf (stderr, "Unknown option character '%c'.\n", optopt);
@@ -66,8 +65,7 @@ int main(int argc, char **argv) {
     }
 
     /* check the passed in values or assign defaults */
-    timerAmount = (tvalue == NULL) ? DEFAULT_TIMER : atoi(tvalue);
-    (lvalue == NULL) ? strcpy(fileName, DEFAULT_FILENAME) : strcpy(fileName, lvalue);
+    numProcesses = (nvalue == NULL) ? DEFAULT_NUM_PROCESSES : atoi(nvalue);
 
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
@@ -81,6 +79,36 @@ int main(int argc, char **argv) {
         exit(errno);
     }
 
+    /* initialize the page table */
+    PageTable pageTable = initializePageTable();
+
+    /* set up the shared memory clock */
+    sharedMemoryClockSetup();
+
+    /* initialize the user processes */
+    userProcess = initializeUserProcess(numProcesses);
+
+    int totalExecutedProcesses = numProcesses;
+    int currentNumProcesses, randomMillis = 0;
+    pid_t childPid;
+
+    do {
+        randomMillis = randomNumberGenerator(500, 1);
+        if(currentNumProcesses <= 18) {
+            childPid = fork();
+
+            /* if this is the child process */
+            if(childPid == 0) {
+
+                fprintf(stderr, "\nMaster: Generating process with PID %d at time %d.%d\n", getpid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+
+            } else if (childPid < 0) {
+                perror("[-]ERROR: Failed to fork CHILD process.\n");
+                exit(errno);
+            }
+        }
+
+    } while(totalExecutedProcesses <= numProcesses);
 }
 
 /*************************************************!
@@ -120,14 +148,13 @@ void signalHandlerMaster(int signo) {
             printf("MASTER: SIGNAL: SIGALRM detected by MASTER\n");
 
         for (i = 0; i < numChildren; i++) {
-            kill(pcb[i].actualPid, SIGINT);
+            kill(userProcess[i].actualPid, SIGINT);
         }
 
         while (wait(&wait_status) > 0) { ; }
 
-        free(pcb);
+        free(userProcess);
         detachAndRemove(sharedMemClockId, sharedMemClock);
-        detachAndRemove(pcbSharedMemId, pcb);
         msgctl(queueSharedMemId, IPC_RMID, NULL);
         exit(0);
     }
@@ -143,8 +170,60 @@ void displayHelp(int flag) {
     if (flag == 1) {
         printf("Options\n");
         printf("\t-h          : Display this message.\n");
-        printf("\t-l filename : Set file to 'filename'. Defaults to '%s'.\n", DEFAULT_FILENAME);
-        printf("\t-t z        : Set time (in seconds) before master terminates. Defaults to '%d'.\n", DEFAULT_TIMER);
+        printf("\t-n numProcesses : Set the number of processes'. Defaults to '%d'.\n", DEFAULT_NUM_PROCESSES);
         exit(0);
     }
+}
+
+/*************************************************!
+* @function    initializePageTable
+* @abstract    initalizes the page table
+* @return      pageTable
+**************************************************/
+PageTable initializePageTable() {
+    PageTable* pageTable = (struct PageTable*) malloc(sizeof(struct PageTable));
+    return *pageTable;
+}
+
+/*******************************************************!
+* @function    sharedMemoryClockSetup
+* @abstract    sets up the shared memory clock
+*******************************************************/
+void sharedMemoryClockSetup() {
+    /* create Shared Memory Clock shared memory segment */
+    if ((sharedMemClockId = shmget(SHARED_MEM_CLOCK_KEY, sizeof(SharedMemClock), IPC_CREAT | 0600)) < 0) {
+        perror("[-]ERROR: Failed to create shared memory segment.");
+        exit(errno);
+    }
+
+    /* attach the shared memory clock */
+    sharedMemClock = shmat(sharedMemClockId, NULL, 0);
+
+    /* initialize the shared memory clock */
+    sharedMemClock->seconds = 0;
+    sharedMemClock->nanoSeconds = 0;
+}
+
+/*************************************************!
+* @function    initializeUserProcess
+* @abstract    sets up the user processes
+* @param       index
+* @return      userProcess
+**************************************************/
+UserProcess* initializeUserProcess(int numProcesses) {
+    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
+    UserProcess* userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * numProcesses);
+    return userProcess;
+}
+
+/*************************************************!
+* @function    randomNumberGenerator
+* @abstract    generates a random number between
+*              MAX and MIN
+* @param       MAX
+* @param       MIN
+* @returns     random number
+**************************************************/
+int randomNumberGenerator(int MAX, int MIN) {
+    return rand()%(MAX - MIN) + MIN;
 }
