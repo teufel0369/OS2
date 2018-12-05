@@ -10,9 +10,9 @@
 #include <sys/msg.h>
 #include "shared.h"
 
-
 /* GLOBAL STRUCTS */
 SharedMemClock* sharedMemClock;
+ProcessStats* processStats;
 UserProcess* userProcess;
 Queue* queue;
 
@@ -26,6 +26,7 @@ int numTerminated;
 int pcbSharedMemId;
 int queueSharedMemId;
 int sharedMemClockId;
+int processStatsId;
 int timerAmount;
 
 /* PROTOTYPES */
@@ -36,6 +37,12 @@ PageTable initializePageTable();
 void sharedMemoryClockSetup();
 UserProcess* initializeUserProcess(int);
 int randomNumberGenerator(int, int);
+unsigned long long getMillis();
+void processStatsSetup();
+int isQueueEmpty(Queue*);
+int isQueueFull(Queue*);
+void pushToQueue(struct Queue*, UserProcess);
+UserProcess popFromQueue(Queue*);
 
 
 int main(int argc, char **argv) {
@@ -82,25 +89,30 @@ int main(int argc, char **argv) {
     /* initialize the page table */
     PageTable pageTable = initializePageTable();
 
+    /* process stats setup */
+    processStatsSetup();
+
     /* set up the shared memory clock */
     sharedMemoryClockSetup();
 
     /* initialize the user processes */
     userProcess = initializeUserProcess(numProcesses);
 
-    int totalExecutedProcesses = numProcesses;
-    int currentNumProcesses, randomMillis = 0;
+    int randomMillis = 0;
     pid_t childPid;
+    int processIndex = 0;
 
     do {
         randomMillis = randomNumberGenerator(500, 1);
-        if(currentNumProcesses <= 18) {
+        if(processStats->activeProcesses <= 18) {
             childPid = fork();
 
             /* if this is the child process */
             if(childPid == 0) {
-
-                fprintf(stderr, "\nMaster: Generating process with PID %d at time %d.%d\n", getpid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                processStats->activeProcesses += 1;
+                fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                snprintf(childId, 10,"%d", processIndex);
+                execl("./child", "./child", childId, NULL);
 
             } else if (childPid < 0) {
                 perror("[-]ERROR: Failed to fork CHILD process.\n");
@@ -108,7 +120,16 @@ int main(int argc, char **argv) {
             }
         }
 
-    } while(totalExecutedProcesses <= numProcesses);
+        processIndex += 1;
+    } while(processStats->activeProcesses < 18 && processStats->totalExecuted < numProcesses);
+
+    /* wait for any remaining child processes to finish */
+    while (wait(&wait_status) > 0) { ; }
+
+    /* detach and remove the message queue, shared memory, and any allocated memory */
+    detachAndRemove(sharedMemClockId, sharedMemClock);
+    detachAndRemove(processStatsId, processStats);
+    return 0;
 }
 
 /*************************************************!
@@ -204,6 +225,25 @@ void sharedMemoryClockSetup() {
     sharedMemClock->nanoSeconds = 0;
 }
 
+/*******************************************************!
+* @function    processStatsSetup
+* @abstract    sets up the shared process records
+*******************************************************/
+void processStatsSetup() {
+    /* create Shared Memory Clock shared memory segment */
+    if ((processStatsId = shmget(SHARED_MEM_STATS_KEY, sizeof(ProcessStats), IPC_CREAT | 0600)) < 0) {
+        perror("[-]ERROR: Failed to create shared memory segment.");
+        exit(errno);
+    }
+
+    /* attach the shared memory process record */
+    processStats = shmat(processStatsId, NULL, 0);
+
+    /* initialize the shared memory process record */
+    processStats->activeProcesses = 0;
+    processStats->totalExecuted = 0;
+}
+
 /*************************************************!
 * @function    initializeUserProcess
 * @abstract    sets up the user processes
@@ -226,4 +266,72 @@ UserProcess* initializeUserProcess(int numProcesses) {
 **************************************************/
 int randomNumberGenerator(int MAX, int MIN) {
     return rand()%(MAX - MIN) + MIN;
+}
+
+/*************************************************!
+* @function    randomNumberGenerator
+* @abstract    converts the shared memory clock to
+*              milliseconds
+* @returns     milliseconds of shared memory clock
+**************************************************/
+unsigned long long getMillis() {
+    return (1000 * sharedMemClock->seconds) + (sharedMemClock->nanoSeconds/1000000);
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    adds the item to the queue if there is
+*              space available
+* @param       queue
+* @param       item
+* @param       priority
+*******************************************************/
+void pushToQueue(struct Queue* queue, UserProcess item) {
+    if(isQueueFull(queue)) {
+        return;
+    }
+    else {
+        queue->rear = (queue->rear+1)%queue->queueCapacity;
+        queue->array[queue->rear] = item;
+        queue->size += 1;
+    }
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    pops the item off of the queue
+* @param       queue
+* @return      item
+*******************************************************/
+UserProcess popFromQueue(Queue* queue) {
+    UserProcess* item = NULL;
+    if(isQueueEmpty(queue)) {
+        return *item;
+    }
+    else {
+        *item = queue->array[queue->rear];
+        queue->front = (queue->rear - 1)%queue->queueCapacity;
+        queue->size = queue->size - 1;
+        return *item;
+    }
+}
+
+/*******************************************************!
+* @function    isQueueFull
+* @abstract    checks to see if the queue is full
+* @param       queue
+* @returns     true or false
+*******************************************************/
+int isQueueFull(Queue* queue) {
+    return (queue->size == queue->queueCapacity);
+}
+
+/*******************************************************!
+* @function    isQueueEmpty
+* @abstract    checks to see if the queue is empty
+* @param       queue
+* @returns     true or false
+*******************************************************/
+int isQueueEmpty(Queue* queue) {
+    return(queue->size == 0);
 }

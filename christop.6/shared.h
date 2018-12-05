@@ -2,12 +2,12 @@
 #ifndef O2_THOMPSON_3_SHARED_H
 #define O2_THOMPSON_3_SHARED_H
 #define SHARED_MEM_CLOCK_KEY 1775
-#define SHARED_MEM_PCB_KEY 72912
+#define SHARED_MEM_STATS_KEY 72912
 #define QUEUE_KEY 1535
 #define MASTER_ID 369
 
 
-#define DEFAULT_NUM_PROCESSES 20
+#define DEFAULT_NUM_PROCESSES 18
 
 #include <stdlib.h>
 
@@ -15,8 +15,6 @@ typedef struct SharedClock {
     unsigned int seconds;
     unsigned int nanoSeconds;
 } SharedMemClock;
-
-
 
 typedef struct UserProcess {
     int index;
@@ -27,6 +25,19 @@ typedef struct UserProcess {
     int burstTime;
     int waitTime;
 } UserProcess;
+
+typedef struct ProcessControlBlock {
+    int pidIndex;
+    pid_t actualPid;
+    int priority;
+    int isScheduled;
+    int isBlocked;
+    int burstTime;
+    int resumeTime;
+    int duration;
+    int progress;
+    int waitTime;
+} PCB;
 
 typedef struct Queue {
     UserProcess* array;
@@ -67,5 +78,10 @@ typedef struct Frames {
     int pageNumber;
     int offset;
 } Frames;
+
+typedef struct TotalProcesses {
+    int activeProcesses;
+    int totalExecuted;
+}ProcessStats;
 
 #endif //O2_THOMPSON_4_SHARED_H
