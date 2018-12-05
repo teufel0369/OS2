@@ -101,10 +101,13 @@ int main(int argc, char **argv) {
     int randomMillis = 0;
     pid_t childPid;
     int processIndex = 0;
+    unsigned long long spawnTime = 0;
+    unsigned long long currentTime = 0;
 
     do {
-        randomMillis = randomNumberGenerator(500, 1);
-        if(processStats->activeProcesses <= 18) {
+        spawnTime = getMillis() + randomNumberGenerator(500, 1);
+        currentTime = getMillis();
+        if(processStats->activeProcesses < 18) {
             childPid = fork();
 
             /* if this is the child process */
@@ -121,7 +124,7 @@ int main(int argc, char **argv) {
         }
 
         processIndex += 1;
-    } while(processStats->activeProcesses < 18 && processStats->totalExecuted < numProcesses);
+    } while(processStats->totalExecuted < numProcesses);
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -275,7 +278,7 @@ int randomNumberGenerator(int MAX, int MIN) {
 * @returns     milliseconds of shared memory clock
 **************************************************/
 unsigned long long getMillis() {
-    return (1000 * sharedMemClock->seconds) + (sharedMemClock->nanoSeconds/1000000);
+    return (sharedMemClock->seconds * 1000) + (sharedMemClock->nanoSeconds/1000000);
 }
 
 /*******************************************************!

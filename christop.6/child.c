@@ -92,11 +92,7 @@ void signalHandlerChild(int signal) {
 void sendMessageToMaster(int messageType, int isdone) {
     Message message;
     size_t messageSize = sizeof(Message) - sizeof(long);
-    message.messageType = messageType;
-    message.childId = childId;
-    message.doneFlag = isdone;
-    message.seconds = shm->seconds;
-    message.nanoSeconds = shm->nanoSeconds;
+
     msgsnd(queueId, &message, messageSize, 0);
 }
 
