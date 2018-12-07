@@ -54,7 +54,7 @@ typedef struct Pages {
 } Pages;
 
 typedef struct PageTable {
-    Pages pages[32];
+    Pages pages[18][32];
 } PageTable;
 
 typedef struct Reference {

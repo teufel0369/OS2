@@ -15,6 +15,8 @@ SharedMemClock* sharedMemClock;
 ProcessStats* processStats;
 UserProcess* userProcess;
 Queue* queue;
+Queue* suspendedQ;
+Frames frames[256];
 
 /* GLOBAL MISC */
 char fileName[1000];
@@ -43,6 +45,9 @@ int isQueueEmpty(Queue*);
 int isQueueFull(Queue*);
 void pushToQueue(struct Queue*, UserProcess);
 UserProcess popFromQueue(Queue*);
+void suspendedCheck(Queue*);
+static void printFrames();
+struct Queue* generateQueue(unsigned int);
 
 
 int main(int argc, char **argv) {
@@ -98,33 +103,50 @@ int main(int argc, char **argv) {
     /* initialize the user processes */
     userProcess = initializeUserProcess(numProcesses);
 
+    /* set up the suspend queue */
+    suspendedQ = generateQueue(18);
+
     int randomMillis = 0;
     pid_t childPid;
     int processIndex = 0;
     unsigned long long spawnTime = 0;
     unsigned long long currentTime = 0;
+    int check = 0;
 
-    do {
+    while(1) {
+
+        if(processStats->totalExecuted >= numProcesses) {
+            break;
+        }
+
+        check++;
+        if(check % 30 == 0) {
+
+        }
+
         spawnTime = getMillis() + randomNumberGenerator(500, 1);
         currentTime = getMillis();
-        if(processStats->activeProcesses < 18) {
-            childPid = fork();
 
-            /* if this is the child process */
-            if(childPid == 0) {
-                processStats->activeProcesses += 1;
-                fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-                snprintf(childId, 10,"%d", processIndex);
-                execl("./child", "./child", childId, NULL);
+        if(currentTime >= spawnTime) {
+            if(processStats->activeProcesses < 18) {
+                childPid = fork();
 
-            } else if (childPid < 0) {
-                perror("[-]ERROR: Failed to fork CHILD process.\n");
-                exit(errno);
+                /* if this is the child process */
+                if(childPid == 0) {
+                    processStats->activeProcesses += 1;
+                    fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                    snprintf(childId, 10,"%d", processIndex);
+                    execl("./child", "./child", childId, NULL);
+
+                } else if (childPid < 0) {
+                    perror("[-]ERROR: Failed to fork CHILD process.\n");
+                    exit(errno);
+                }
             }
         }
 
         processIndex += 1;
-    } while(processStats->totalExecuted < numProcesses);
+    }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
@@ -313,7 +335,7 @@ UserProcess popFromQueue(Queue* queue) {
     }
     else {
         *item = queue->array[queue->rear];
-        queue->front = (queue->rear - 1)%queue->queueCapacity;
+        queue->rear = (queue->rear - 1)%queue->queueCapacity;
         queue->size = queue->size - 1;
         return *item;
     }
@@ -337,4 +359,74 @@ int isQueueFull(Queue* queue) {
 *******************************************************/
 int isQueueEmpty(Queue* queue) {
     return(queue->size == 0);
+}
+
+void suspendedCheck(Queue* queue) {
+    int isDirty = 0;
+    UserProcess userProcess = popFromQueue(queue);
+
+    //set request time to 15ms
+    int reqtime = 15000000;
+
+//    if(.dirty == 1){
+//        isDirty = 1;
+//    }
+}
+
+void loadFrame(int processIndex, int pageNumber) {
+    int i;
+    for(i = 0; i < 256; i++) {
+
+    }
+}
+
+static void printFrames() {
+    int p;
+    fprintf(logfile, "Current memory layout at time %d:%d is:\n", sharedMemClock->seconds, sharedMemClock->nanoSeconds); fflush(logfile);
+
+    for(p = 0; p < 256; p++) {
+        if(frames[p].dirty == 0) {
+            fprintf(logfile, "U"); fflush(logfile);
+
+        } else if(frames[p].dirty == 1) {
+            fprintf(logfile, "D"); fflush(logfile);
+
+        }
+        else {
+            fprintf(logfile, "."); fflush(logfile);
+        }
+    }
+
+    fprintf(logfile, "\n"); fflush(logfile);
+
+    for(p = 0; p < 256; p++) {
+        if(frames[p].used == 0) {
+            fprintf(logfile, "0"); fflush(logfile);
+
+        } else if(frames[p].used == 1) {
+            fprintf(logfile, "1"); fflush(logfile);
+
+        } else {
+            fprintf(logfile, "."); fflush(logfile);
+        }
+    }
+
+    fprintf(logfile, "\n"); fflush(logfile);
+
+}
+
+/*******************************************************!
+* @function    generateQueue
+* @abstract    generates the Queue
+* @param       capacity
+* @returns     queue
+*******************************************************/
+struct Queue* generateQueue(unsigned int capacity) {
+    /* allocate space for the Queue and initialize the queue */
+    struct Queue* queue = (struct Queue*) malloc(sizeof(struct Queue));
+    queue->queueCapacity = capacity;
+    queue->front = queue->size = 0;
+    queue->rear = capacity - 1;
+    queue->array = (PCB*)malloc(queue->queueCapacity * sizeof(PCB));
+    return queue;
 }
