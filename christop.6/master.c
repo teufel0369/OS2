@@ -13,10 +13,10 @@
 /* GLOBAL STRUCTS */
 SharedMemClock* sharedMemClock;
 ProcessStats* processStats;
-UserProcess* userProcess;
 Queue* queue;
 Queue* suspendedQ;
 Frames frames[256];
+Process* processQueue;
 
 /* GLOBAL MISC */
 char fileName[1000];
@@ -30,6 +30,8 @@ int queueSharedMemId;
 int sharedMemClockId;
 int processStatsId;
 int timerAmount;
+int readWriteConfig;
+int readWriteConfig;
 
 /* PROTOTYPES */
 void displayHelp(int);
@@ -37,33 +39,36 @@ void signalHandlerMaster(int);
 int detachAndRemove(int, void*);
 PageTable initializePageTable();
 void sharedMemoryClockSetup();
-UserProcess* initializeUserProcess(int);
 int randomNumberGenerator(int, int);
-unsigned long long getMillis();
+unsigned int getMillis();
 void processStatsSetup();
 int isQueueEmpty(Queue*);
 int isQueueFull(Queue*);
-void pushToQueue(struct Queue*, UserProcess);
-UserProcess popFromQueue(Queue*);
+void pushToQueue(struct Queue*, Message);
+Message popFromQueue(Queue*);
 void suspendedCheck(Queue*);
 static void printFrames();
 struct Queue* generateQueue(unsigned int);
+void rollClock(int);
 
 
 int main(int argc, char **argv) {
     srand(time(NULL));
     int c, i, wait_status;
     char childId[10];
-    char* nvalue = NULL;
-    int numProcesses;
+    char readWriteRatio[10];
+    char* nvalue, pvalue = NULL;
 
-    while ((c = getopt (argc, argv, "h n::")) != -1) {
+    while ((c = getopt (argc, argv, "h n::p::")) != -1) {
         switch (c) {
             case 'h':
                 displayHelp(1);
                 break;
             case 'n':
                 nvalue = optarg;
+                break;
+            case 'p':
+                pvalue = optarg;
                 break;
             case '?':
                 if (optopt == 'n')
@@ -77,7 +82,8 @@ int main(int argc, char **argv) {
     }
 
     /* check the passed in values or assign defaults */
-    numProcesses = (nvalue == NULL) ? DEFAULT_NUM_PROCESSES : atoi(nvalue);
+    numChildren = (nvalue == NULL) ? DEFAULT_NUM_PROCESSES : atoi(nvalue);
+    readWriteConfig = (pvalue == NULL || atoi(pvalue) > 99) ? 50 : atoi(pvalue);
 
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
@@ -100,52 +106,55 @@ int main(int argc, char **argv) {
     /* set up the shared memory clock */
     sharedMemoryClockSetup();
 
-    /* initialize the user processes */
-    userProcess = initializeUserProcess(numProcesses);
-
     /* set up the suspend queue */
     suspendedQ = generateQueue(18);
+
+    processQueue = (struct Process*) malloc(sizeof(struct Process) * 18);
 
     int randomMillis = 0;
     pid_t childPid;
     int processIndex = 0;
-    unsigned long long spawnTime = 0;
-    unsigned long long currentTime = 0;
+    unsigned int spawnTime = 0;
+    unsigned int currentTime = 0;
     int check = 0;
+    int index = 0;
 
     while(1) {
 
-        if(processStats->totalExecuted >= numProcesses) {
+        if(processStats->totalExecuted >= numChildren) {
             break;
         }
 
-        check++;
+        check++; //suspend check goes here
         if(check % 30 == 0) {
-
+            ;
         }
 
-        spawnTime = getMillis() + randomNumberGenerator(500, 1);
+        spawnTime = randomNumberGenerator(500, 1);
         currentTime = getMillis();
 
-        if(currentTime >= spawnTime) {
-            if(processStats->activeProcesses < 18) {
-                childPid = fork();
+        fprintf(stderr, "\nMaster: current time %u\n", currentTime);
+        fprintf(stderr, "\nMaster: spawn time %u\n", spawnTime);
 
-                /* if this is the child process */
-                if(childPid == 0) {
-                    processStats->activeProcesses += 1;
-                    fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
-                    snprintf(childId, 10,"%d", processIndex);
-                    execl("./child", "./child", childId, NULL);
+        if(processStats->activeProcesses < 18) {
+            childPid = fork();
 
-                } else if (childPid < 0) {
-                    perror("[-]ERROR: Failed to fork CHILD process.\n");
-                    exit(errno);
-                }
+            /* if this is the child process */
+            if(childPid == 0) {
+
+                processStats->activeProcesses += 1;
+                fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
+                snprintf(childId, 10,"%d", processIndex);
+                snprintf(readWriteRatio, 10,"%d", processIndex);
+                execl("./child", "./child", childId, readWriteRatio, NULL);
+
+            } else if (childPid < 0) {
+                perror("[-]ERROR: Failed to fork CHILD process.\n");
+                exit(errno);
             }
         }
 
-        processIndex += 1;
+        sharedMemClock->nanoSeconds += 1000;
     }
 
     /* wait for any remaining child processes to finish */
@@ -155,6 +164,21 @@ int main(int argc, char **argv) {
     detachAndRemove(sharedMemClockId, sharedMemClock);
     detachAndRemove(processStatsId, processStats);
     return 0;
+}
+
+/*************************************************!
+* @function    rollClock()
+* @abstract    rolls the shared memory clock
+* @param       seconds
+* @param       nanos
+**************************************************/
+void rollClock(int nanos) {
+    if(sharedMemClock->nanoSeconds >= 900000000) {
+        sharedMemClock->seconds = sharedMemClock->seconds + 1;
+        sharedMemClock->nanoSeconds = 0;
+    } else {
+        sharedMemClock->nanoSeconds = sharedMemClock->nanoSeconds + nanos;
+    }
 }
 
 /*************************************************!
@@ -194,12 +218,11 @@ void signalHandlerMaster(int signo) {
             printf("MASTER: SIGNAL: SIGALRM detected by MASTER\n");
 
         for (i = 0; i < numChildren; i++) {
-            kill(userProcess[i].actualPid, SIGINT);
+            kill(processQueue[i].actualPid, SIGINT);
         }
 
         while (wait(&wait_status) > 0) { ; }
 
-        free(userProcess);
         detachAndRemove(sharedMemClockId, sharedMemClock);
         msgctl(queueSharedMemId, IPC_RMID, NULL);
         exit(0);
@@ -270,18 +293,6 @@ void processStatsSetup() {
 }
 
 /*************************************************!
-* @function    initializeUserProcess
-* @abstract    sets up the user processes
-* @param       index
-* @return      userProcess
-**************************************************/
-UserProcess* initializeUserProcess(int numProcesses) {
-    /* Allocate memory for user processes, but will not be in shared memory. Seems easier to manage this way */
-    UserProcess* userProcess = (struct UserProcess*) malloc(sizeof(struct UserProcess) * numProcesses);
-    return userProcess;
-}
-
-/*************************************************!
 * @function    randomNumberGenerator
 * @abstract    generates a random number between
 *              MAX and MIN
@@ -299,7 +310,7 @@ int randomNumberGenerator(int MAX, int MIN) {
 *              milliseconds
 * @returns     milliseconds of shared memory clock
 **************************************************/
-unsigned long long getMillis() {
+unsigned int getMillis() {
     return (sharedMemClock->seconds * 1000) + (sharedMemClock->nanoSeconds/1000000);
 }
 
@@ -311,7 +322,7 @@ unsigned long long getMillis() {
 * @param       item
 * @param       priority
 *******************************************************/
-void pushToQueue(struct Queue* queue, UserProcess item) {
+void pushToQueue(struct Queue* queue, Message item) {
     if(isQueueFull(queue)) {
         return;
     }
@@ -328,8 +339,8 @@ void pushToQueue(struct Queue* queue, UserProcess item) {
 * @param       queue
 * @return      item
 *******************************************************/
-UserProcess popFromQueue(Queue* queue) {
-    UserProcess* item = NULL;
+Message popFromQueue(Queue* queue) {
+    Message* item = NULL;
     if(isQueueEmpty(queue)) {
         return *item;
     }
@@ -363,7 +374,7 @@ int isQueueEmpty(Queue* queue) {
 
 void suspendedCheck(Queue* queue) {
     int isDirty = 0;
-    UserProcess userProcess = popFromQueue(queue);
+    Message message = popFromQueue(queue);
 
     //set request time to 15ms
     int reqtime = 15000000;
@@ -427,6 +438,6 @@ struct Queue* generateQueue(unsigned int capacity) {
     queue->queueCapacity = capacity;
     queue->front = queue->size = 0;
     queue->rear = capacity - 1;
-    queue->array = (PCB*)malloc(queue->queueCapacity * sizeof(PCB));
+    queue->array = (Message*)malloc(queue->queueCapacity * sizeof(Message));
     return queue;
 }

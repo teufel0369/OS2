@@ -10,17 +10,23 @@
 #include "shared.h"
 
 int childId;
+int readWriteRatio;
 int sharedMemId;
 int sharedMemStatsId;
 int pcbMemId;
 int queueId;
+int readWriteConfig;
 SharedMemClock* shm;
 ProcessStats* processStats;
+Message messageFromMaster;
 
 void sendMessageToMaster(int, int);
 void signalHandlerChild(int);
 int random5050();
-Message receiveMessageFromMaster(int);
+void receiveMessageFromMaster(int);
+int randomReadOrWrite();
+int randomNumberGenerator(int, int);
+void requestMemory();
 
 /*******************************************************!
 * @function    main
@@ -30,11 +36,13 @@ Message receiveMessageFromMaster(int);
 * @return      0 if it doesn't blow up
 *******************************************************/
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
+    if (argc < 3) {
         fprintf(stderr, "\n[-]ERROR: Missing process Num.\n");
         exit(1);
     }
+
     childId = atoi(argv[1]);
+    readWriteRatio = atoi(argv[2]);
 
     /* register signal handler */
     if (signal(SIGINT, signalHandlerChild) == SIG_ERR) {
@@ -65,9 +73,23 @@ int main(int argc, char *argv[]) {
     processStats = (ProcessStats *) shmat(sharedMemStatsId, NULL, 0);
     printf("\nChild %d attached to shared memory process stats service\n", childId);
 
+    Message message;
+
+    while(1) {
+       receiveMessageFromMaster(childId);
+
+       if(message.terminate == 1 && message.pid == getpid()) {
+           break;
+       } else {
+            requestMemory();
+       }
+
+
+    }
 
     processStats->totalExecuted += 1;
     processStats->activeProcesses -= 1;
+    printf("\nChild %d terminating\n", childId);
     return 0;
 }
 
@@ -79,7 +101,6 @@ int main(int argc, char *argv[]) {
 * @param       signo signal number received
 *******************************************************/
 void signalHandlerChild(int signal) {
-
     exit(0);
 }
 
@@ -92,7 +113,8 @@ void signalHandlerChild(int signal) {
 void sendMessageToMaster(int messageType, int isdone) {
     Message message;
     size_t messageSize = sizeof(Message) - sizeof(long);
-
+    message.index = childId;
+    message.terminate =
     msgsnd(queueId, &message, messageSize, 0);
 }
 
@@ -101,9 +123,54 @@ void sendMessageToMaster(int messageType, int isdone) {
 * @abstract    removes a message from the message queue
 * @param       messageType
 *******************************************************/
-Message receiveMessageFromMaster(int messageType) {
-    Message message;
-    int messageSize = sizeof(Message);
-    msgrcv(queueId, &message, messageSize, messageType, 0);
-    return message;
+void receiveMessageFromMaster(int messageType) {
+    size_t messageSize = sizeof(Message);
+    int check;
+    if((check = msgrcv(queueId, &messageFromMaster, messageSize, messageType, 0)) == -1) {
+        printf("User: Failed to get Message!\n");
+    }
+}
+
+/*******************************************************!
+* @function    requestMemory
+* @abstract    requests memory from
+* @param       messageType
+*******************************************************/
+void requestMemory() {
+    Message requestMemoryMessage;
+    requestMemoryMessage.type = MASTER_ID;
+    requestMemoryMessage.index = childId;
+    requestMemoryMessage.terminate = 0;
+    requestMemoryMessage.ref.pageNumber = childId;
+    requestMemoryMessage.ref.offset = rand() % 32;
+    requestMemoryMessage.pid = getpid();
+    requestMemoryMessage.dirty = randomReadOrWrite();
+
+    printf("User: Process %d is requesting Page# %d with offset: %d from OSS!\n", requestMemoryMessage.pid, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
+
+    msgsnd(queueId, &requestMemoryMessage, sizeof(Message), 1);
+}
+
+/*************************************************!
+* @function    randomNumberGenerator
+* @abstract    generates a random number between
+*              MAX and MIN
+* @param       MAX
+* @param       MIN
+* @returns     random number
+**************************************************/
+int randomNumberGenerator(int MAX, int MIN) {
+    return rand()%(MAX - MIN) + MIN;
+}
+
+/*************************************************!
+* @function    randomReadOrWrite
+* @returns     random number
+**************************************************/
+int randomReadOrWrite() {
+    if(randomNumberGenerator(1, 100) > readWriteRatio) {
+        return 1;
+    } else {
+        return 0;
+    }
 }

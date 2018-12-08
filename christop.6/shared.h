@@ -16,36 +16,10 @@ typedef struct SharedClock {
     unsigned int nanoSeconds;
 } SharedMemClock;
 
-typedef struct UserProcess {
-    int index;
+typedef struct Process {
     pid_t actualPid;
-    int priority;
-    int duration;
-    int progress;
-    int burstTime;
-    int waitTime;
-} UserProcess;
-
-typedef struct ProcessControlBlock {
-    int pidIndex;
-    pid_t actualPid;
-    int priority;
-    int isScheduled;
-    int isBlocked;
-    int burstTime;
-    int resumeTime;
-    int duration;
-    int progress;
-    int waitTime;
-} PCB;
-
-typedef struct Queue {
-    UserProcess* array;
-    int front;
-    int rear;
-    int size;
-    unsigned int queueCapacity;
-} Queue;
+    int indexNumber;
+} Process;
 
 typedef struct Pages {
     int occupied;
@@ -64,12 +38,20 @@ typedef struct Reference {
 
 typedef struct Message {
     long type;
-    long pid;
+    pid_t pid;
     int index;
     int dirty;
     int terminate;
     Reference ref;
 } Message;
+
+typedef struct Queue {
+    Message* array;
+    int front;
+    int rear;
+    int size;
+    unsigned int queueCapacity;
+} Queue;
 
 typedef struct Frames {
     int dirty;
@@ -82,6 +64,6 @@ typedef struct Frames {
 typedef struct TotalProcesses {
     int activeProcesses;
     int totalExecuted;
-}ProcessStats;
+} ProcessStats;
 
 #endif //O2_THOMPSON_4_SHARED_H
