@@ -3,7 +3,7 @@
 #define O2_THOMPSON_3_SHARED_H
 #define SHARED_MEM_CLOCK_KEY 1775
 #define SHARED_MEM_STATS_KEY 72912
-#define USER_PROCESS_KEY 4604
+#define MESSAGE_QUEUE_KEY 4604
 #define QUEUE_KEY 1535
 #define MASTER_ID 369
 
@@ -18,10 +18,9 @@ typedef struct SharedClock {
     unsigned int nanoSeconds;
 } SharedMemClock;
 
-typedef struct Process {
-    pid_t actualPid;
-    int indexNumber;
-} Process;
+typedef struct QueueStatus {
+    int isQueueFree;
+} MessageQueueCheck;
 
 typedef struct Pages {
     int occupied;
@@ -48,8 +47,10 @@ typedef struct Message {
     int messageTestMaster;
     int messageTestChild;
     int passedCommChecks;
+    int suspended;
     Reference ref;
     int isScheduled;
+    int requestingMemory;
 } Message;
 
 typedef struct User {

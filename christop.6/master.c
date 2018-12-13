@@ -33,6 +33,13 @@ Queue* queue;
 Queue* suspendedQ;
 Frames frames[256];
 UserProcess* userProcesses;
+Message* messageFromChild;
+
+int messageFlag;
+
+int sharedMessageCheckId;
+
+MessageQueueCheck* sharedMessageCheck;
 
 /* PROTOTYPES */
 void displayHelp(int);
@@ -51,12 +58,12 @@ void suspendedCheck(Queue*);
 static void printFrames();
 struct Queue* generateQueue(unsigned int);
 void rollClock(int);
-Message receiveMessageFromChild(int);
+void receiveMessageFromChild(int);
 void sendMessageToChild(int, Message);
 void sendMessageTestToChild(int, UserProcess);
 UserProcess setUpUserProcess(pid_t, int);
 void userProcessUpdate(Message);
-
+void queueStatusSetup();
 
 int main(int argc, char **argv) {
     srand(time(NULL));
@@ -121,6 +128,8 @@ int main(int argc, char **argv) {
 
     userProcesses = (struct User*) malloc(sizeof(struct User) * numChildren);
 
+    void queueStatusSetup();
+
     int randomMillis = 0;
     pid_t childPid;
     int processIndex = 0;
@@ -128,11 +137,19 @@ int main(int argc, char **argv) {
     unsigned int currentTime = 0;
     int check = 0;
     int index = 0;
-    Message messageFromChild;
     size_t arraySize;
     UserProcess newProcess;
 
     while(1) {
+        receiveMessageFromChild(MASTER_ID);
+
+        if(messageFlag == 1) {
+            sharedMessageCheck->isQueueFree = 1;
+            if(messageFromChild->requestingMemory == 1) {
+                sharedMemClock->nanoSeconds += (15 * 1000000);
+                fprintf(stderr, "\nMaster: Child %d is requesting write of address 0x%d%d at time %u:%u\n", messageFromChild->index, messageFromChild->ref.pageNumber, messageFromChild->ref.offset);
+            }
+        }
 
         check++; //suspend check goes here
         if(check % 30 == 0) {
@@ -164,10 +181,6 @@ int main(int argc, char **argv) {
                 exit(errno);
             }
         }
-
-//        arraySize = sizeof(userProcesses) / sizeof(userProcesses[0]);
-
-        sendMessageTestToChild(processIndex, userProcesses[processIndex]);
 
         if(processIndex >= numChildren) {
             break;
@@ -311,6 +324,21 @@ void processStatsSetup() {
     /* initialize the shared memory process record */
     processStats->activeProcesses = 0;
     processStats->totalExecuted = 0;
+}
+
+/*******************************************************!
+* @function    processStatsSetup
+* @abstract    sets up the shared message queue flag
+*******************************************************/
+void queueStatusSetup() {
+    /* create Shared Memory Clock shared memory segment */
+    if ((sharedMessageCheckId = shmget(MESSAGE_QUEUE_KEY, sizeof(MessageQueueCheck), IPC_CREAT | 0600)) < 0) {
+        perror("[-]ERROR: Failed to create shared memory segment.");
+        exit(errno);
+    }
+
+    /* attach the shared memory process record */
+    sharedMessageCheck = shmat(sharedMessageCheckId, NULL, 0);
 }
 
 /*************************************************!
@@ -470,13 +498,16 @@ struct Queue* generateQueue(unsigned int capacity) {
  * @param       pidIndex index of the pidIndex
  * @returns     actual index from the pid array
  **************************************************/
-Message receiveMessageFromChild(int messageType) {
+void receiveMessageFromChild(int messageType) {
     printf("actually inside receive function");
     int check;
-    Message message;
     static int messageSize = sizeof(Message);
-    msgrcv(messageQueueId, &message, messageSize, messageType, 0);
-    return message;
+    if(msgrcv(messageQueueId, &messageFromChild, (size_t) messageSize, messageType, IPC_NOWAIT) == -1) {
+        messageFlag = 0;
+    } else {
+        printf("\nMaster: Received message from Child %d received message from Master\n", messageFromChild->index);
+        messageFlag = 1;
+    }
 }
 
 /*************************************************!

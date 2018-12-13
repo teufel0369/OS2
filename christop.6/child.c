@@ -16,10 +16,15 @@ int sharedMemStatsId;
 int pcbMemId;
 int queueId;
 int readWriteConfig;
+int messageFlag;
 SharedMemClock* shm;
 ProcessStats* processStats;
 Message messageFromMaster;
 Message requestMemoryMessage;
+
+int sharedMessageCheckId;
+
+MessageQueueCheck* sharedMessageCheck;
 
 void sendMessageToMaster(int, Message);
 void signalHandlerChild(int);
@@ -73,28 +78,38 @@ int main(int argc, char *argv[]) {
     /* attach shared memory */
     processStats = (ProcessStats *) shmat(sharedMemStatsId, NULL, 0);
     printf("\nChild %d attached to shared memory process stats service\n", childId);
-    int numRef = 0;
 
-    while(1) {
-        printf("\nChild %d has not received a message yet.\n", childId);
-        receiveMessageFromMaster(childId);
-        if(messageFromMaster.messageTestMaster == 1){
-            printf("\nChild %d received a message from master\n", childId);
-            break;
-        }
+    /* create Shared Memory Clock shared memory segment */
+    if ((sharedMessageCheckId = shmget(MESSAGE_QUEUE_KEY, sizeof(MessageQueueCheck), 0600)) < 0) {
+        perror("[-]ERROR: Failed to create shared memory segment.");
+        exit(errno);
     }
 
-//       if((numRef % 1000) == 0) {
-//           if(messageFromMaster.terminate == 1) {
-//               printf("\nChild %d received terminate signal from Master\n", childId);
-//               break;
-//           }
-//       } else {
-//            requestMemory();
-//            printf("\nChild %d requesting memory at page number %d and offset %d.\n", childId, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
-//            numRef += 1;
-//       }
-//    }
+    /* attach the shared memory process record */
+    sharedMessageCheck = shmat(sharedMessageCheckId, NULL, 0);
+
+    int numRef = 0;
+    while(1) {
+        receiveMessageFromMaster(childId);
+
+        if(messageFlag == 1) {
+            if((numRef % 1000) == 0) {
+                if(messageFromMaster.terminateFromMaster == 1) {
+                    printf("\nChild %d received terminate signal from Master\n", childId);
+                    break;
+                }
+            }
+        } else {
+            if(sharedMessageCheck->isQueueFree == 1) {
+                requestMemory();
+            }
+        }
+
+
+
+        printf("\nChild %d requesting memory at page number %d and offset %d.\n", childId, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
+        numRef += 1;
+    }
 
     processStats->totalExecuted += 1;
     processStats->activeProcesses -= 1;
@@ -122,7 +137,7 @@ void signalHandlerChild(int signal) {
 void sendMessageToMaster(int messageType, Message message) {
     size_t messageSize = sizeof(Message) - sizeof(long);
     message.index = childId;
-    msgsnd(queueId, &message, messageSize, 0);
+    msgsnd(queueId, &message, messageSize, messageType);
 }
 
 /*******************************************************!
@@ -132,12 +147,11 @@ void sendMessageToMaster(int messageType, Message message) {
 *******************************************************/
 void receiveMessageFromMaster(int messageType) {
     static int messageSize = sizeof(Message);
-    ssize_t check;
-    printf("\nChild %d waiting on message\n", childId);
     if(msgrcv(queueId, &messageFromMaster, (size_t) messageSize, messageType, IPC_NOWAIT) == -1) {
-        printf("\nUser: Failed to get Message!\n");
+        messageFlag = 0;
     } else {
-        printf("\nUser: Received message from Master\n");
+        printf("\nChild %d received message from Master\n", childId);
+        messageFlag = 1;
     }
 }
 
@@ -147,6 +161,7 @@ void receiveMessageFromMaster(int messageType) {
 * @param       messageType
 *******************************************************/
 void requestMemory() {
+    requestMemoryMessage.requestingMemory = 1;
     requestMemoryMessage.type = MASTER_ID;
     requestMemoryMessage.index = childId;
     requestMemoryMessage.childProcessTerminating = 0;
@@ -154,10 +169,7 @@ void requestMemory() {
     requestMemoryMessage.ref.offset = rand() % 32;
     requestMemoryMessage.pid = getpid();
     requestMemoryMessage.dirty = randomReadOrWrite();
-
-    printf("User: Process %d is requesting Page# %d with offset: %d from OSS!\n", requestMemoryMessage.pid, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
-
-    msgsnd(queueId, &requestMemoryMessage, sizeof(Message), 1);
+    msgsnd(queueId, &requestMemoryMessage, sizeof(Message), MASTER_ID);
 }
 
 /*************************************************!
