@@ -10,14 +10,6 @@
 #include <sys/msg.h>
 #include "shared.h"
 
-/* GLOBAL STRUCTS */
-SharedMemClock* sharedMemClock;
-ProcessStats* processStats;
-Queue* queue;
-Queue* suspendedQ;
-Frames frames[256];
-Process* processQueue;
-
 /* GLOBAL MISC */
 char fileName[1000];
 char* pcbAddress;
@@ -32,6 +24,15 @@ int processStatsId;
 int timerAmount;
 int readWriteConfig;
 int readWriteConfig;
+int messageQueueId;
+
+/* GLOBAL STRUCTS */
+SharedMemClock* sharedMemClock;
+ProcessStats* processStats;
+Queue* queue;
+Queue* suspendedQ;
+Frames frames[256];
+UserProcess* userProcesses;
 
 /* PROTOTYPES */
 void displayHelp(int);
@@ -39,7 +40,7 @@ void signalHandlerMaster(int);
 int detachAndRemove(int, void*);
 PageTable initializePageTable();
 void sharedMemoryClockSetup();
-int randomNumberGenerator(int, int);
+unsigned int randomNumberGenerator(int, int);
 unsigned int getMillis();
 void processStatsSetup();
 int isQueueEmpty(Queue*);
@@ -50,6 +51,11 @@ void suspendedCheck(Queue*);
 static void printFrames();
 struct Queue* generateQueue(unsigned int);
 void rollClock(int);
+Message receiveMessageFromChild(int);
+void sendMessageToChild(int, Message);
+void sendMessageTestToChild(int, UserProcess);
+UserProcess setUpUserProcess(pid_t, int);
+void userProcessUpdate(Message);
 
 
 int main(int argc, char **argv) {
@@ -57,7 +63,10 @@ int main(int argc, char **argv) {
     int c, i, wait_status;
     char childId[10];
     char readWriteRatio[10];
-    char* nvalue, pvalue = NULL;
+    char* nvalue;
+    char* pvalue;
+    numChildren = DEFAULT_NUM_PROCESSES;
+    readWriteConfig = 50;
 
     while ((c = getopt (argc, argv, "h n::p::")) != -1) {
         switch (c) {
@@ -66,9 +75,11 @@ int main(int argc, char **argv) {
                 break;
             case 'n':
                 nvalue = optarg;
+                numChildren = atoi(nvalue);
                 break;
             case 'p':
                 pvalue = optarg;
+                readWriteConfig = atoi(pvalue);
                 break;
             case '?':
                 if (optopt == 'n')
@@ -80,10 +91,6 @@ int main(int argc, char **argv) {
                 abort();
         }
     }
-
-    /* check the passed in values or assign defaults */
-    numChildren = (nvalue == NULL) ? DEFAULT_NUM_PROCESSES : atoi(nvalue);
-    readWriteConfig = (pvalue == NULL || atoi(pvalue) > 99) ? 50 : atoi(pvalue);
 
     /* register signal handler (SIGINT) */
     if (signal(SIGINT, signalHandlerMaster) == SIG_ERR) {
@@ -106,10 +113,13 @@ int main(int argc, char **argv) {
     /* set up the shared memory clock */
     sharedMemoryClockSetup();
 
+    /* create message queue */
+    messageQueueId = msgget(QUEUE_KEY, IPC_CREAT | 0666);
+
     /* set up the suspend queue */
     suspendedQ = generateQueue(18);
 
-    processQueue = (struct Process*) malloc(sizeof(struct Process) * 18);
+    userProcesses = (struct User*) malloc(sizeof(struct User) * numChildren);
 
     int randomMillis = 0;
     pid_t childPid;
@@ -118,12 +128,11 @@ int main(int argc, char **argv) {
     unsigned int currentTime = 0;
     int check = 0;
     int index = 0;
+    Message messageFromChild;
+    size_t arraySize;
+    UserProcess newProcess;
 
     while(1) {
-
-        if(processStats->totalExecuted >= numChildren) {
-            break;
-        }
 
         check++; //suspend check goes here
         if(check % 30 == 0) {
@@ -137,15 +146,17 @@ int main(int argc, char **argv) {
         fprintf(stderr, "\nMaster: spawn time %u\n", spawnTime);
 
         if(processStats->activeProcesses < 18) {
+            processIndex++;
             childPid = fork();
 
             /* if this is the child process */
             if(childPid == 0) {
-
+                newProcess = setUpUserProcess(getpid(), processIndex);
+                userProcesses[processIndex-1] = newProcess;
                 processStats->activeProcesses += 1;
                 fprintf(stderr, "\nMaster: Generating process with PID %d and PPID %d at time %d.%d\n", getpid(), getppid(), sharedMemClock->seconds, sharedMemClock->nanoSeconds);
                 snprintf(childId, 10,"%d", processIndex);
-                snprintf(readWriteRatio, 10,"%d", processIndex);
+                snprintf(readWriteRatio, 10,"%d", readWriteConfig);
                 execl("./child", "./child", childId, readWriteRatio, NULL);
 
             } else if (childPid < 0) {
@@ -154,13 +165,22 @@ int main(int argc, char **argv) {
             }
         }
 
-        sharedMemClock->nanoSeconds += 1000;
+//        arraySize = sizeof(userProcesses) / sizeof(userProcesses[0]);
+
+        sendMessageTestToChild(processIndex, userProcesses[processIndex]);
+
+        if(processIndex >= numChildren) {
+            break;
+        }
+
+        sharedMemClock->nanoSeconds += 10;
     }
 
     /* wait for any remaining child processes to finish */
     while (wait(&wait_status) > 0) { ; }
 
     /* detach and remove the message queue, shared memory, and any allocated memory */
+    msgctl(messageQueueId, IPC_RMID, NULL);
     detachAndRemove(sharedMemClockId, sharedMemClock);
     detachAndRemove(processStatsId, processStats);
     return 0;
@@ -173,6 +193,7 @@ int main(int argc, char **argv) {
 * @param       nanos
 **************************************************/
 void rollClock(int nanos) {
+    sharedMemClock->nanoSeconds += nanos;
     if(sharedMemClock->nanoSeconds >= 900000000) {
         sharedMemClock->seconds = sharedMemClock->seconds + 1;
         sharedMemClock->nanoSeconds = 0;
@@ -218,7 +239,7 @@ void signalHandlerMaster(int signo) {
             printf("MASTER: SIGNAL: SIGALRM detected by MASTER\n");
 
         for (i = 0; i < numChildren; i++) {
-            kill(processQueue[i].actualPid, SIGINT);
+            kill(userProcesses[i].pid, SIGINT);
         }
 
         while (wait(&wait_status) > 0) { ; }
@@ -300,8 +321,8 @@ void processStatsSetup() {
 * @param       MIN
 * @returns     random number
 **************************************************/
-int randomNumberGenerator(int MAX, int MIN) {
-    return rand()%(MAX - MIN) + MIN;
+unsigned int randomNumberGenerator(int MAX, int MIN) {
+    return (unsigned int) rand()%(MAX - MIN) + MIN;
 }
 
 /*************************************************!
@@ -440,4 +461,83 @@ struct Queue* generateQueue(unsigned int capacity) {
     queue->rear = capacity - 1;
     queue->array = (Message*)malloc(queue->queueCapacity * sizeof(Message));
     return queue;
+}
+
+/*************************************************!
+ * @function    receiveMessageFromChild
+ * @abstract    get the index from the array of
+ *              children... it'll be useful
+ * @param       pidIndex index of the pidIndex
+ * @returns     actual index from the pid array
+ **************************************************/
+Message receiveMessageFromChild(int messageType) {
+    printf("actually inside receive function");
+    int check;
+    Message message;
+    static int messageSize = sizeof(Message);
+    msgrcv(messageQueueId, &message, messageSize, messageType, 0);
+    return message;
+}
+
+/*************************************************!
+* @function    sendMessageToChild
+* @abstract    inserts a message into the message
+*              queue for the child
+* @param       messageType
+**************************************************/
+void sendMessageToChild(int messageType, Message message) {
+    size_t messageSize = sizeof(Message);
+    message.type = messageType;
+    msgsnd(messageQueueId, &message, messageSize, 0);
+}
+
+/*************************************************!
+* @function    sendMessageTestToChild
+* @abstract    inserts a message into the message
+*              queue for the child
+* @param       messageType
+**************************************************/
+void sendMessageTestToChild(int messageType, UserProcess userProcess1) {
+    Message message;
+    static int messageSize = sizeof(Message);
+    message.type = messageType;
+    message.pid = userProcess1.pid;
+    message.index = userProcess1.index;
+    message.messageTestMaster = 1;
+    msgsnd(messageQueueId, &message, (size_t) messageSize, messageType);
+}
+
+/*************************************************!
+* @function    setUpUserProcess
+* @abstract    sets up a user process
+* @param       pid
+* @param       index
+**************************************************/
+UserProcess setUpUserProcess(pid_t pid, int index) {
+    UserProcess userProcess1;
+    userProcess1.index = index;
+    userProcess1.pid = pid;
+    userProcess1.scheduled = 0;
+    userProcess1.terminated = 0;
+    userProcess1.isActive = 1;
+    return userProcess1;
+}
+
+/*************************************************!
+* @function    userProcessUpdate
+* @abstract    update the user process
+* @param       message
+* @param       userProcess1
+**************************************************/
+void userProcessUpdate(Message message) {
+    UserProcess userProcess1;
+    int i;
+    size_t arraySize = sizeof(userProcesses) / sizeof(userProcesses[0]);
+    for(i = 0; i < arraySize; i++) {
+        if(userProcesses[i].pid == message.pid) {
+            userProcesses[i].pid = message.pid;
+            userProcesses[i].index = message.index;
+            userProcesses[i].terminated = message.childProcessTerminating;
+        }
+    }
 }

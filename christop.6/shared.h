@@ -3,6 +3,7 @@
 #define O2_THOMPSON_3_SHARED_H
 #define SHARED_MEM_CLOCK_KEY 1775
 #define SHARED_MEM_STATS_KEY 72912
+#define USER_PROCESS_KEY 4604
 #define QUEUE_KEY 1535
 #define MASTER_ID 369
 
@@ -10,6 +11,7 @@
 #define DEFAULT_NUM_PROCESSES 18
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef struct SharedClock {
     unsigned int seconds;
@@ -41,9 +43,22 @@ typedef struct Message {
     pid_t pid;
     int index;
     int dirty;
-    int terminate;
+    int terminateFromMaster;
+    int childProcessTerminating;
+    int messageTestMaster;
+    int messageTestChild;
+    int passedCommChecks;
     Reference ref;
+    int isScheduled;
 } Message;
+
+typedef struct User {
+    pid_t pid;
+    int index;
+    int scheduled;
+    int isActive;
+    int terminated;
+} UserProcess;
 
 typedef struct Queue {
     Message* array;

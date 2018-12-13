@@ -19,8 +19,9 @@ int readWriteConfig;
 SharedMemClock* shm;
 ProcessStats* processStats;
 Message messageFromMaster;
+Message requestMemoryMessage;
 
-void sendMessageToMaster(int, int);
+void sendMessageToMaster(int, Message);
 void signalHandlerChild(int);
 int random5050();
 void receiveMessageFromMaster(int);
@@ -36,7 +37,7 @@ void requestMemory();
 * @return      0 if it doesn't blow up
 *******************************************************/
 int main(int argc, char *argv[]) {
-    if (argc < 3) {
+    if (argc < 2) {
         fprintf(stderr, "\n[-]ERROR: Missing process Num.\n");
         exit(1);
     }
@@ -63,7 +64,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* access message queue*/
-    queueId = msgget(QUEUE_KEY, 0600);
+    queueId = msgget(QUEUE_KEY, 0666);
 
     /* attach shared memory */
     shm = (SharedMemClock *) shmat(sharedMemId, NULL, 0);
@@ -72,20 +73,28 @@ int main(int argc, char *argv[]) {
     /* attach shared memory */
     processStats = (ProcessStats *) shmat(sharedMemStatsId, NULL, 0);
     printf("\nChild %d attached to shared memory process stats service\n", childId);
-
-    Message message;
+    int numRef = 0;
 
     while(1) {
-       receiveMessageFromMaster(childId);
-
-       if(message.terminate == 1 && message.pid == getpid()) {
-           break;
-       } else {
-            requestMemory();
-       }
-
-
+        printf("\nChild %d has not received a message yet.\n", childId);
+        receiveMessageFromMaster(childId);
+        if(messageFromMaster.messageTestMaster == 1){
+            printf("\nChild %d received a message from master\n", childId);
+            break;
+        }
     }
+
+//       if((numRef % 1000) == 0) {
+//           if(messageFromMaster.terminate == 1) {
+//               printf("\nChild %d received terminate signal from Master\n", childId);
+//               break;
+//           }
+//       } else {
+//            requestMemory();
+//            printf("\nChild %d requesting memory at page number %d and offset %d.\n", childId, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
+//            numRef += 1;
+//       }
+//    }
 
     processStats->totalExecuted += 1;
     processStats->activeProcesses -= 1;
@@ -110,11 +119,9 @@ void signalHandlerChild(int signal) {
 * @param       messageType
 * @param       isDone
 *******************************************************/
-void sendMessageToMaster(int messageType, int isdone) {
-    Message message;
+void sendMessageToMaster(int messageType, Message message) {
     size_t messageSize = sizeof(Message) - sizeof(long);
     message.index = childId;
-    message.terminate =
     msgsnd(queueId, &message, messageSize, 0);
 }
 
@@ -124,10 +131,13 @@ void sendMessageToMaster(int messageType, int isdone) {
 * @param       messageType
 *******************************************************/
 void receiveMessageFromMaster(int messageType) {
-    size_t messageSize = sizeof(Message);
-    int check;
-    if((check = msgrcv(queueId, &messageFromMaster, messageSize, messageType, 0)) == -1) {
-        printf("User: Failed to get Message!\n");
+    static int messageSize = sizeof(Message);
+    ssize_t check;
+    printf("\nChild %d waiting on message\n", childId);
+    if(msgrcv(queueId, &messageFromMaster, (size_t) messageSize, messageType, IPC_NOWAIT) == -1) {
+        printf("\nUser: Failed to get Message!\n");
+    } else {
+        printf("\nUser: Received message from Master\n");
     }
 }
 
@@ -137,10 +147,9 @@ void receiveMessageFromMaster(int messageType) {
 * @param       messageType
 *******************************************************/
 void requestMemory() {
-    Message requestMemoryMessage;
     requestMemoryMessage.type = MASTER_ID;
     requestMemoryMessage.index = childId;
-    requestMemoryMessage.terminate = 0;
+    requestMemoryMessage.childProcessTerminating = 0;
     requestMemoryMessage.ref.pageNumber = childId;
     requestMemoryMessage.ref.offset = rand() % 32;
     requestMemoryMessage.pid = getpid();
@@ -168,7 +177,7 @@ int randomNumberGenerator(int MAX, int MIN) {
 * @returns     random number
 **************************************************/
 int randomReadOrWrite() {
-    if(randomNumberGenerator(1, 100) > readWriteRatio) {
+    if (randomNumberGenerator(1, 100) > readWriteRatio) {
         return 1;
     } else {
         return 0;
