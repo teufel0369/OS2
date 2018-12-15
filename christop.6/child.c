@@ -100,14 +100,9 @@ int main(int argc, char *argv[]) {
                 }
             }
         } else {
-            if(sharedMessageCheck->isQueueFree == 1) {
-                requestMemory();
-            }
+            requestMemory();
         }
 
-
-
-        printf("\nChild %d requesting memory at page number %d and offset %d.\n", childId, requestMemoryMessage.ref.pageNumber, requestMemoryMessage.ref.offset);
         numRef += 1;
     }
 
@@ -135,9 +130,9 @@ void signalHandlerChild(int signal) {
 * @param       isDone
 *******************************************************/
 void sendMessageToMaster(int messageType, Message message) {
-    size_t messageSize = sizeof(Message) - sizeof(long);
+    static int messageSize = sizeof(Message);
     message.index = childId;
-    msgsnd(queueId, &message, messageSize, messageType);
+    msgsnd(queueId, &message, (size_t) messageSize, messageType);
 }
 
 /*******************************************************!
@@ -169,7 +164,9 @@ void requestMemory() {
     requestMemoryMessage.ref.offset = rand() % 32;
     requestMemoryMessage.pid = getpid();
     requestMemoryMessage.dirty = randomReadOrWrite();
-    msgsnd(queueId, &requestMemoryMessage, sizeof(Message), MASTER_ID);
+    fprintf(stderr, "Sending request message to master");
+    static int messageSize = sizeof(Message);
+    msgsnd(queueId, &requestMemoryMessage, (size_t) messageSize, 0);
 }
 
 /*************************************************!

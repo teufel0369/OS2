@@ -58,7 +58,7 @@ void suspendedCheck(Queue*);
 static void printFrames();
 struct Queue* generateQueue(unsigned int);
 void rollClock(int);
-void receiveMessageFromChild(int);
+void receiveMessageFromChild();
 void sendMessageToChild(int, Message);
 void sendMessageTestToChild(int, UserProcess);
 UserProcess setUpUserProcess(pid_t, int);
@@ -128,7 +128,9 @@ int main(int argc, char **argv) {
 
     userProcesses = (struct User*) malloc(sizeof(struct User) * numChildren);
 
-    void queueStatusSetup();
+    messageFromChild = (struct Message*) malloc(sizeof(struct Message));
+
+    queueStatusSetup();
 
     int randomMillis = 0;
     pid_t childPid;
@@ -141,13 +143,17 @@ int main(int argc, char **argv) {
     UserProcess newProcess;
 
     while(1) {
-        receiveMessageFromChild(MASTER_ID);
+        receiveMessageFromChild();
 
         if(messageFlag == 1) {
-            sharedMessageCheck->isQueueFree = 1;
             if(messageFromChild->requestingMemory == 1) {
                 sharedMemClock->nanoSeconds += (15 * 1000000);
-                fprintf(stderr, "\nMaster: Child %d is requesting write of address 0x%d%d at time %u:%u\n", messageFromChild->index, messageFromChild->ref.pageNumber, messageFromChild->ref.offset);
+                fprintf(stderr, "\nMaster: Child %d is requesting write of address 0x%d%d at time %u:%u\n",
+                        messageFromChild->index,
+                        messageFromChild->ref.pageNumber,
+                        messageFromChild->ref.offset,
+                        sharedMemClock->seconds,
+                        sharedMemClock->nanoSeconds);
             }
         }
 
@@ -158,9 +164,6 @@ int main(int argc, char **argv) {
 
         spawnTime = randomNumberGenerator(500, 1);
         currentTime = getMillis();
-
-        fprintf(stderr, "\nMaster: current time %u\n", currentTime);
-        fprintf(stderr, "\nMaster: spawn time %u\n", spawnTime);
 
         if(processStats->activeProcesses < 18) {
             processIndex++;
@@ -433,13 +436,6 @@ void suspendedCheck(Queue* queue) {
 //    }
 }
 
-void loadFrame(int processIndex, int pageNumber) {
-    int i;
-    for(i = 0; i < 256; i++) {
-
-    }
-}
-
 static void printFrames() {
     int p;
     fprintf(logfile, "Current memory layout at time %d:%d is:\n", sharedMemClock->seconds, sharedMemClock->nanoSeconds); fflush(logfile);
@@ -498,14 +494,12 @@ struct Queue* generateQueue(unsigned int capacity) {
  * @param       pidIndex index of the pidIndex
  * @returns     actual index from the pid array
  **************************************************/
-void receiveMessageFromChild(int messageType) {
-    printf("actually inside receive function");
-    int check;
+void receiveMessageFromChild() {
     static int messageSize = sizeof(Message);
-    if(msgrcv(messageQueueId, &messageFromChild, (size_t) messageSize, messageType, IPC_NOWAIT) == -1) {
+    if(msgrcv(messageQueueId, &messageFromChild, (size_t) messageSize, MASTER_ID, IPC_NOWAIT) == -1) {
         messageFlag = 0;
     } else {
-        printf("\nMaster: Received message from Child %d received message from Master\n", messageFromChild->index);
+        printf("\nMaster: Received message from Child %d\n", messageFromChild->index);
         messageFlag = 1;
     }
 }
